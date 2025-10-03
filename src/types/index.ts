@@ -15,6 +15,7 @@ export interface StaffUpdate {
   Description: string;
   Date: string;
   Link?: string;
+  image?: string | Array<{url: string}>;
 }
 
 // Staff Messages Types
@@ -38,7 +39,7 @@ export interface Leader {
   'Type of Campus': 'Micro-Campus' | 'NCLC' | 'CHE - New Castle' | 'Inspired Learning' | 'Mt Zion' | 'Pagosa Valor Academy' | 'Admin' | 'New Castle Teacher' | 'Venture Off' | 'Branch Campus';
   'CHE Email': string;
   'Campus Director': string[];
-  ProfilePic?: string;
+  ProfilePic?: string | Array<{url: string}>;
   UID?: string; // Firebase UID
 }
 
@@ -47,6 +48,7 @@ export type RootTabParamList = {
   Updates: undefined;
   Info: undefined;
   Messages: undefined;
+  Profile: undefined;
 };
 
 // Auth Types

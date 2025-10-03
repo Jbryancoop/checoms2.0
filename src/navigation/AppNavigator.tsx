@@ -8,10 +8,15 @@ import { RootTabParamList } from '../types';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import InfoScreen from '../screens/InfoScreen';
 import MessagesScreen from '../screens/MessagesScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export default function AppNavigator() {
+interface AppNavigatorProps {
+  onLogout: () => void;
+}
+
+export default function AppNavigator({ onLogout }: AppNavigatorProps) {
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -25,6 +30,8 @@ export default function AppNavigator() {
               iconName = focused ? 'information-circle' : 'information-circle-outline';
             } else if (route.name === 'Messages') {
               iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+            } else if (route.name === 'Profile') {
+              iconName = focused ? 'person' : 'person-outline';
             } else {
               iconName = 'help-outline';
             }
@@ -45,7 +52,10 @@ export default function AppNavigator() {
         <Tab.Screen 
           name="Updates" 
           component={UpdatesScreen}
-          options={{ title: 'Updates' }}
+          options={{ 
+            title: 'Updates',
+            headerShown: false
+          }}
         />
         <Tab.Screen 
           name="Info" 
@@ -57,6 +67,12 @@ export default function AppNavigator() {
           component={MessagesScreen}
           options={{ title: 'Messages' }}
         />
+        <Tab.Screen 
+          name="Profile" 
+          options={{ title: 'Profile' }}
+        >
+          {() => <ProfileScreen onLogout={onLogout} />}
+        </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
   );

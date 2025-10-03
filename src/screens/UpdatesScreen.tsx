@@ -6,20 +6,25 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
-  Linking,
   Alert,
+  Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StaffUpdate } from '../types';
 import { AirtableService } from '../services/airtable';
+import UpdateDetailScreen from './UpdateDetailScreen';
 
 export default function UpdatesScreen() {
   const [updates, setUpdates] = useState<StaffUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedUpdate, setSelectedUpdate] = useState<StaffUpdate | null>(null);
 
   const loadUpdates = useCallback(async () => {
     try {
+      console.log('🔄 Loading updates...');
       const staffUpdates = await AirtableService.getStaffUpdates();
+      console.log('📱 Received updates in UpdatesScreen:', staffUpdates);
       setUpdates(staffUpdates);
     } catch (error) {
       console.error('Error loading updates:', error);
@@ -39,18 +44,12 @@ export default function UpdatesScreen() {
     loadUpdates();
   }, [loadUpdates]);
 
-  const handleLinkPress = async (url: string) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Cannot open this link');
-      }
-    } catch (error) {
-      console.error('Error opening link:', error);
-      Alert.alert('Error', 'Failed to open link');
-    }
+  const handleUpdatePress = (update: StaffUpdate) => {
+    setSelectedUpdate(update);
+  };
+
+  const handleBack = () => {
+    setSelectedUpdate(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -66,21 +65,37 @@ export default function UpdatesScreen() {
     }
   };
 
-  const renderUpdate = ({ item }: { item: StaffUpdate }) => (
-    <View style={styles.updateCard}>
-      <Text style={styles.updateTitle}>{item.Title}</Text>
-      <Text style={styles.updateDate}>{formatDate(item.Date)}</Text>
-      <Text style={styles.updateDescription}>{item.Description}</Text>
-      {item.Link && (
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => handleLinkPress(item.Link!)}
-        >
-          <Text style={styles.linkText}>View Link</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const getImageUrl = (update: StaffUpdate) => {
+    if (!update.image) return null;
+    return Array.isArray(update.image) ? update.image[0]?.url : update.image;
+  };
+
+  const renderUpdate = ({ item }: { item: StaffUpdate }) => {
+    const imageUrl = getImageUrl(item);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.updateCard} 
+        onPress={() => handleUpdatePress(item)}
+        activeOpacity={0.7}
+      >
+        {imageUrl && (
+          <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+        )}
+        <View style={styles.cardContent}>
+          <Text style={styles.updateTitle}>{item.Title}</Text>
+          <Text style={styles.updateDate}>{formatDate(item.Date)}</Text>
+          <Text style={styles.updateDescription} numberOfLines={3}>
+            {item.Description}
+          </Text>
+          <View style={styles.cardFooter}>
+            <Text style={styles.readMoreText}>Tap to read more</Text>
+            <Ionicons name="chevron-forward" size={16} color="#007AFF" />
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -99,8 +114,22 @@ export default function UpdatesScreen() {
     );
   }
 
+  if (selectedUpdate) {
+    return (
+      <UpdateDetailScreen 
+        update={selectedUpdate} 
+        onBack={handleBack} 
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Updates</Text>
+      </View>
+      
       <FlatList
         data={updates}
         renderItem={renderUpdate}
@@ -119,7 +148,19 @@ export default function UpdatesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f2f2f7',
+  },
+  header: {
+    backgroundColor: '#007AFF',
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
@@ -131,51 +172,61 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   listContainer: {
-    padding: 16,
+    paddingTop: 8,
     paddingBottom: 32,
   },
   updateCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 10,
+    marginBottom: 12,
+    marginHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#e0e0e0',
+  },
+  cardContent: {
+    padding: 16,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  readMoreText: {
+    fontSize: 15,
+    color: '#007AFF',
+    fontWeight: '400',
   },
   updateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
     marginBottom: 4,
+    lineHeight: 22,
   },
   updateDate: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 15,
+    color: '#8e8e93',
     marginBottom: 8,
+    fontWeight: '400',
   },
   updateDescription: {
     fontSize: 16,
-    color: '#555',
+    color: '#000',
     lineHeight: 22,
-    marginBottom: 12,
-  },
-  linkButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  linkText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '400',
   },
   emptyState: {
     flex: 1,

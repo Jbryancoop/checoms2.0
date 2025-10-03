@@ -31,6 +31,7 @@ const FIELDS = {
     DESCRIPTION: 'flddJaRWFiWOFQvlg',
     DATE: 'fldzU9kcRvqWeD29c',
     LINK: 'fldzWuRsBGwVQXfm6',
+    IMAGE: 'fldImage', // TODO: Replace with actual image field ID from Airtable
   },
   STAFF_MESSAGES: {
     SENDER_EMAIL: 'flds3SeBpOoGJSwbI',
@@ -188,19 +189,54 @@ export class AirtableService {
   // Get staff updates
   static async getStaffUpdates(): Promise<StaffUpdate[]> {
     try {
+      console.log('🔍 Fetching staff updates from Airtable...');
+      console.log('🔍 Using table ID:', TABLES.STAFF_UPDATES);
+      
       const records = await base(TABLES.STAFF_UPDATES)
         .select({
-          sort: [{ field: FIELDS.STAFF_UPDATES.DATE, direction: 'desc' }],
+          sort: [{ field: 'Date', direction: 'desc' }],
         })
         .firstPage();
 
-      return records.map(record => ({
-        id: record.id,
-        Title: record.get(FIELDS.STAFF_UPDATES.TITLE) as string,
-        Description: record.get(FIELDS.STAFF_UPDATES.DESCRIPTION) as string,
-        Date: record.get(FIELDS.STAFF_UPDATES.DATE) as string,
-        Link: record.get(FIELDS.STAFF_UPDATES.LINK) as string,
-      }));
+      console.log('🔍 Found records:', records.length);
+      
+      if (records.length === 0) {
+        console.log('🔍 No records found, checking if table has any data...');
+        const allRecords = await base(TABLES.STAFF_UPDATES)
+          .select({
+            maxRecords: 5,
+          })
+          .firstPage();
+        
+        console.log('🔍 Sample records in table:', allRecords.map(r => ({
+          id: r.id,
+          fields: r.fields
+        })));
+        
+        return [];
+      }
+
+      const updates = records.map(record => {
+        console.log('🔍 Processing record:', {
+          id: record.id,
+          fields: record.fields
+        });
+        
+        const update = {
+          id: record.id,
+          Title: record.get('Title') as string,
+          Description: record.get('Description') as string,
+          Date: record.get('Date') as string,
+          Link: record.get('Link') as string,
+          image: record.get('image') as string | Array<{url: string}>,
+        };
+        
+        console.log('🔍 Processed update:', update);
+        return update;
+      });
+      
+      console.log('✅ Returning updates:', updates);
+      return updates;
     } catch (error) {
       console.error('Error fetching staff updates:', error);
       throw error;
@@ -212,16 +248,16 @@ export class AirtableService {
     try {
       const records = await base(TABLES.STAFF_MESSAGES)
         .select({
-          sort: [{ field: FIELDS.STAFF_MESSAGES.TIMESTAMP, direction: 'desc' }],
+          sort: [{ field: 'Timestamp', direction: 'desc' }],
         })
         .firstPage();
 
       return records.map(record => ({
         id: record.id,
-        SenderEmail: record.get(FIELDS.STAFF_MESSAGES.SENDER_EMAIL) as string,
-        RecipientGroup: record.get(FIELDS.STAFF_MESSAGES.RECIPIENT_GROUP) as any,
-        Message: record.get(FIELDS.STAFF_MESSAGES.MESSAGE) as string,
-        Timestamp: record.get(FIELDS.STAFF_MESSAGES.TIMESTAMP) as string,
+        SenderEmail: record.get('Sender') as string, // This is a linked record, might need adjustment
+        RecipientGroup: record.get('RecipientGroup') as any,
+        Message: record.get('Message') as string,
+        Timestamp: record.get('Timestamp') as string,
       }));
     } catch (error) {
       console.error('Error fetching staff messages:', error);
@@ -239,9 +275,9 @@ export class AirtableService {
       await base(TABLES.STAFF_MESSAGES).create([
         {
           fields: {
-            [FIELDS.STAFF_MESSAGES.SENDER_EMAIL]: senderEmail,
-            [FIELDS.STAFF_MESSAGES.RECIPIENT_GROUP]: recipientGroup,
-            [FIELDS.STAFF_MESSAGES.MESSAGE]: message,
+            'Sender': senderEmail, // This might need to be a linked record ID
+            'RecipientGroup': recipientGroup,
+            'Message': message,
           },
         },
       ]);

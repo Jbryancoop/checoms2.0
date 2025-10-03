@@ -1,0 +1,25 @@
+Table Name,Field Name,Field Type,Primary Key,Read Only,Description
+Staff,Micro-Campus Leader,Long text,Yes,Yes,Primary field
+Staff,Full Name,Long text,No,Yes,
+Staff,First Name,Single line text,No,Yes,
+Staff,Last Name,Single line text,No,Yes,
+Staff,Google ID,Single line text,No,Yes,
+Staff,Phone,Phone number,No,Yes,
+Staff,Type of Campus,Single select,No,Yes,"9 options: Micro-Campus, NCLC, CHE - New Castle, Inspired Learning, Mt Zion, Pagosa Valor Academy, Admin, New Castle Teacher, Venture Off, Branch Campus"
+Staff,CHE Email,Single line text,No,Yes,
+Staff,Campus Director (from Micro-Campus Data),Multiple select,No,Yes,"2 options: Kristina Wright, Lindsey Rowe"
+Staff,ProfilePic,Attachment,No,Yes,
+Staff,Push Token,Long text,No,No,
+Staff,StaffMessages,Linked record,No,No,Links to StaffMessages table
+Staff,Role,Single select,No,No,"4 options: Staff, Coordinator, Director, Tech"
+Staff,UID,Single line text,No,No,
+StaffUpdates,Title,Single line text,Yes,No,Primary field
+StaffUpdates,Description,Long text,No,No,
+StaffUpdates,Date,Date,No,No,
+StaffUpdates,Link,Single line text,No,No,
+StaffUpdates,image,Attachment,No,No,AI generation: on-demand
+StaffMessages,SenderMessage,Single line text,Yes,No,Formula field: Concatenates Sender with formatted created date and time
+StaffMessages,RecipientGroup,Single select,No,No,"3 options: Coordinator, Director, Tech"
+StaffMessages,Message,Long text,No,No,
+StaffMessages,Timestamp,Date,No,No,Formula field: CREATED_TIME()
+StaffMessages,Sender,Linked record,No,No,Links to Staff table

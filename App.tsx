@@ -26,6 +26,10 @@ export default function App() {
     setIsAuthenticated(true);
   };
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+
   if (isLoading) {
     return null; // You can add a loading screen here
   }
@@ -34,7 +38,7 @@ export default function App() {
     <>
       <StatusBar style="light" />
       {isAuthenticated ? (
-        <AppNavigator />
+        <AppNavigator onLogout={handleLogout} />
       ) : (
         <AuthScreen onAuthSuccess={handleAuthSuccess} />
       )}
