@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { StaffUpdate } from '../types';
 import { AirtableService } from '../services/airtable';
+import PreloadService from '../services/preloadService';
 import UpdateDetailScreen from './UpdateDetailScreen';
 
 export default function UpdatesScreen() {
@@ -20,9 +21,22 @@ export default function UpdatesScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedUpdate, setSelectedUpdate] = useState<StaffUpdate | null>(null);
 
-  const loadUpdates = useCallback(async () => {
+  const loadUpdates = useCallback(async (useCache = true) => {
     try {
       console.log('🔄 Loading updates...');
+
+      // Try to use preloaded data first
+      if (useCache && PreloadService.isDataPreloaded()) {
+        const preloadedUpdates = PreloadService.getPreloadedUpdates();
+        if (preloadedUpdates.length > 0) {
+          console.log('📱 Using preloaded updates:', preloadedUpdates.length);
+          setUpdates(preloadedUpdates);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Otherwise fetch fresh data
       const staffUpdates = await AirtableService.getStaffUpdates();
       console.log('📱 Received updates in UpdatesScreen:', staffUpdates);
       setUpdates(staffUpdates);
@@ -41,7 +55,9 @@ export default function UpdatesScreen() {
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
-    loadUpdates();
+    // Clear cache and fetch fresh data on refresh
+    PreloadService.clearPreloadedData();
+    loadUpdates(false);
   }, [loadUpdates]);
 
   const handleUpdatePress = (update: StaffUpdate) => {

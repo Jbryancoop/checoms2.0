@@ -1,7 +1,8 @@
 // Use Firebase Web SDK
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { initializeAuth, getAuth, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 // Firebase config from environment variables
 const firebaseConfig = {
@@ -13,11 +14,38 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase only if not already initialized
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Firebase Auth and Firestore
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Initialize Firebase Auth with local persistence
+// Use getAuth if already initialized, otherwise initializeAuth
+let auth: any;
+try {
+  auth = initializeAuth(app, {
+    persistence: browserLocalPersistence
+  });
+} catch (error: any) {
+  // If already initialized, just get the existing auth instance
+  if (error.code === 'auth/already-initialized') {
+    auth = getAuth(app);
+  } else {
+    throw error;
+  }
+}
 
-console.log('🔥 Firebase Web SDK initialized');
+export { auth };
+
+// Initialize Firestore with React Native compatibility
+const db = getFirestore(app);
+
+// Configure Firestore for React Native
+if (Platform.OS !== 'web') {
+  // Enable network for Firestore
+  import('firebase/firestore').then(({ enableNetwork }) => {
+    enableNetwork(db).catch(console.error);
+  });
+}
+
+export { db };
+
+console.log('🔥 Firebase Web SDK initialized with local persistence and React Native Firestore config');

@@ -8,7 +8,8 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Image,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MessageService } from '../services/messageService';
@@ -16,6 +17,7 @@ import { AuthService } from '../services/auth';
 import { AnyUser, Conversation } from '../types';
 import UserSelectionScreen from './UserSelectionScreen';
 import ConversationScreen from './ConversationScreen';
+import ProfileImage from '../components/ProfileImage';
 
 export default function MessagesScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -24,89 +26,85 @@ export default function MessagesScreen() {
   const [showUserSelection, setShowUserSelection] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<AnyUser | null>(null);
   const [currentUser, setCurrentUser] = useState<AnyUser | null>(null);
+  const [conversationsUnsubscribe, setConversationsUnsubscribe] = useState<(() => void) | null>(null);
 
   useEffect(() => {
-    loadCurrentUser();
-    loadConversations();
+    const initializeData = async () => {
+      await loadCurrentUser();
+    };
+    initializeData();
   }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      loadConversations();
+    }
+
+    // Cleanup function
+    return () => {
+      if (conversationsUnsubscribe) {
+        conversationsUnsubscribe();
+      }
+    };
+  }, [currentUser]);
 
   const loadCurrentUser = async () => {
     try {
+      console.log('🔄 Loading current user...');
       const authResult = await AuthService.getCurrentUserWithStaffInfo();
       if (authResult) {
+        console.log('✅ Current user loaded:', authResult.userInfo);
         setCurrentUser(authResult.userInfo);
+      } else {
+        console.log('❌ No current user found');
       }
     } catch (error) {
       console.error('Error loading current user:', error);
     }
   };
 
-  const loadConversations = async () => {
+  const loadConversations = () => {
     try {
       setIsLoading(true);
-      
+
+      console.log('🔄 Loading conversations, currentUser:', currentUser);
+      console.log('🔄 Current user UID:', currentUser?.UID);
+
       if (!currentUser?.UID) {
-        console.log('No current user UID available, using mock data');
-        // Use mock data for now
-        const mockConversations: Conversation[] = [
-          {
-            id: '1',
-            recipient: {
-              id: 'user1',
-              'Full Name': 'Sarah Johnson',
-              'First Name': 'Sarah',
-              'Last Name': 'Johnson',
-              'Email': 'sarah.johnson@che.school',
-              'Phone': '(555) 123-4567',
-              'User Type': 'Staff',
-              'UID': 'uid1',
-              'ProfilePic': undefined,
-              'Active': true,
-            },
-            lastMessage: 'Thanks for the update on the project!',
-            lastMessageTime: new Date(Date.now() - 300000).toISOString(),
-            unreadCount: 2,
-            isOnline: true,
-          },
-          {
-            id: '2',
-            recipient: {
-              id: 'user2',
-              'Full Name': 'Mike Chen',
-              'First Name': 'Mike',
-              'Last Name': 'Chen',
-              'Email': 'mike.chen@che.school',
-              'Phone': '(555) 234-5678',
-              'User Type': 'Admin',
-              'UID': 'uid2',
-              'ProfilePic': undefined,
-              'Active': true,
-            },
-            lastMessage: 'Can we schedule a meeting for tomorrow?',
-            lastMessageTime: new Date(Date.now() - 1800000).toISOString(),
-            unreadCount: 0,
-            isOnline: false,
-          },
-        ];
-        setConversations(mockConversations);
+        console.log('No current user UID available, cannot load conversations');
+        setConversations([]);
         setIsLoading(false);
         return;
       }
 
-      const conversations = await MessageService.getConversations(currentUser.UID);
-      setConversations(conversations);
+      // Clean up previous listener if exists
+      if (conversationsUnsubscribe) {
+        conversationsUnsubscribe();
+      }
+
+      // Set up real-time listener for conversations
+      const unsubscribe = MessageService.getConversationsRealtime(currentUser.UID, (conversations) => {
+        console.log('📱 Real-time conversations update:', conversations);
+        setConversations(conversations);
+        setIsLoading(false);
+      });
+
+      // Store unsubscribe function for cleanup
+      setConversationsUnsubscribe(() => unsubscribe);
     } catch (error) {
       console.error('Error loading conversations:', error);
       Alert.alert('Error', 'Failed to load conversations');
-    } finally {
       setIsLoading(false);
     }
   };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    await loadConversations();
-    setIsRefreshing(false);
+    // The real-time listener will automatically update the conversations
+    // Just wait a moment for the refresh to complete
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 1000);
   };
 
   const handleNewMessage = () => {
@@ -122,6 +120,36 @@ export default function MessagesScreen() {
     setSelectedRecipient(null);
     // Refresh conversations when coming back
     loadConversations();
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    Alert.alert(
+      'Delete Conversation',
+      'Are you sure you want to delete this conversation?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (!currentUser?.UID) {
+                Alert.alert('Error', 'User not found');
+                return;
+              }
+              await MessageService.deleteConversation(conversationId, currentUser.UID);
+              console.log('✅ Conversation deleted successfully');
+            } catch (error) {
+              console.error('❌ Error deleting conversation:', error);
+              Alert.alert('Error', 'Failed to delete conversation. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatLastMessageTime = (timestamp: string) => {
@@ -140,51 +168,109 @@ export default function MessagesScreen() {
     }
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={styles.conversationCard}
-      onPress={() => setSelectedRecipient(item.recipient)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.conversationInfo}>
-        <View style={styles.avatarContainer}>
-          {item.recipient.ProfilePic ? (
-            <Image 
-              source={{ 
-                uri: Array.isArray(item.recipient.ProfilePic) 
-                  ? item.recipient.ProfilePic[0]?.url 
-                  : item.recipient.ProfilePic 
-              }} 
-              style={styles.avatar}
-              onError={() => console.log('Failed to load profile image')}
+  const SwipeableConversation = ({ item }: { item: Conversation }) => {
+    const translateX = React.useRef(new Animated.Value(0)).current;
+    const [showDelete, setShowDelete] = useState(false);
+
+    const panResponder = React.useRef(
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 100;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dx < 0) {
+            translateX.setValue(gestureState.dx);
+            setShowDelete(gestureState.dx < -50);
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx < -100) {
+            // Swipe far enough to show delete
+            Animated.spring(translateX, {
+              toValue: -100,
+              useNativeDriver: true,
+            }).start();
+            setShowDelete(true);
+          } else {
+            // Snap back
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+            setShowDelete(false);
+          }
+        },
+      })
+    ).current;
+
+    return (
+      <View style={styles.swipeContainer}>
+        {showDelete && (
+          <View style={styles.rightActions}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteConversation(item.id)}
+            >
+              <Ionicons name="trash" size={24} color="#fff" />
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <Animated.View
+          style={[
+            styles.conversationCard,
+            { transform: [{ translateX }] }
+          ]}
+          {...panResponder.panHandlers}
+        >
+          <TouchableOpacity
+            style={styles.conversationInfo}
+            onPress={() => setSelectedRecipient(item.recipient)}
+            activeOpacity={0.7}
+          >
+            <ProfileImage
+              profilePic={item.recipient.ProfilePic}
+              size={50}
+              showOnlineIndicator={true}
+              isOnline={item.isOnline}
             />
-          ) : (
-            <View style={styles.defaultAvatar}>
-              <Ionicons name="person" size={20} color="#007AFF" />
-            </View>
-          )}
-          {item.isOnline && <View style={styles.onlineIndicator} />}
-        </View>
-        
-        <View style={styles.conversationDetails}>
-          <View style={styles.conversationHeader}>
-            <Text style={styles.recipientName}>{item.recipient['Full Name']}</Text>
-            <Text style={styles.lastMessageTime}>{formatLastMessageTime(item.lastMessageTime)}</Text>
-          </View>
-          <View style={styles.conversationFooter}>
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              {item.lastMessage}
-            </Text>
-            {item.unreadCount > 0 && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+            
+            <View style={styles.conversationDetails}>
+              <View style={styles.conversationHeader}>
+                <Text style={styles.recipientName}>
+                  {item.recipient['Full Name'] || 'Unknown User'}
+                </Text>
+                <Text style={styles.lastMessageTime}>{formatLastMessageTime(item.lastMessageTime)}</Text>
               </View>
-            )}
-          </View>
-        </View>
+              <View style={styles.conversationFooter}>
+                <Text style={styles.lastMessage} numberOfLines={1}>
+                  {item.lastMessage}
+                </Text>
+                {item.unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
+
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    console.log('🎨 Rendering conversation:', {
+      id: item.id,
+      recipient: item.recipient,
+      recipientName: item.recipient['Full Name'],
+      hasProfilePic: !!item.recipient.ProfilePic,
+      profilePicData: item.recipient.ProfilePic,
+      lastMessage: item.lastMessage
+    });
+
+    return <SwipeableConversation item={item} />;
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -269,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#f2f2f7',
     paddingTop: 50,
-    paddingBottom: 15,
+    paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: '#c6c6c8',
@@ -285,13 +371,14 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: 32,
   },
   conversationCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -380,7 +467,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    paddingTop: 50,
   },
   emptyStateText: {
     fontSize: 18,
@@ -416,5 +503,36 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: '#8e8e93',
+  },
+  // Swipe to delete styles
+  swipeContainer: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  rightActions: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 16,
+    zIndex: 1,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

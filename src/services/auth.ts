@@ -4,11 +4,15 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  User
+  User,
+  Auth
 } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { AirtableService } from './airtable';
 import { Leader, AppUser, AnyUser } from '../types';
+
+// Type assertion for auth to fix implicit any type issues
+const typedAuth = auth as Auth;
 
 export class AuthService {
   // Configure Google Sign-In
@@ -43,7 +47,7 @@ export class AuthService {
       const googleCredential = GoogleAuthProvider.credential(idToken);
 
       // Sign-in the user with the credential
-      const result = await signInWithCredential(auth, googleCredential);
+      const result = await signInWithCredential(typedAuth, googleCredential);
       const user = result.user;
 
       if (!user.email) {
@@ -75,7 +79,8 @@ export class AuthService {
         await AirtableService.updateStaffUID(user.email, user.uid);
         console.log('✅ Successfully updated UID in Leaders table');
       } catch (error) {
-        console.warn('⚠️ Failed to update UID in Leaders table, trying Users table:', error);
+        // This is expected if user is in Users table instead of Leaders table
+        console.log('ℹ️ User not found in Leaders table, trying Users table...');
         try {
           await AirtableService.updateUserUID(user.email, user.uid);
           console.log('✅ Successfully updated UID in Users table');
@@ -84,6 +89,9 @@ export class AuthService {
           // Don't fail the authentication if UID update fails
         }
       }
+
+      // Ensure the userInfo has the Firebase UID
+      userInfo.UID = user.uid;
 
       return { user, userInfo };
     } catch (error) {
@@ -95,7 +103,7 @@ export class AuthService {
   // Sign out
   static async signOut(): Promise<void> {
     try {
-      await firebaseSignOut(auth);
+      await firebaseSignOut(typedAuth);
       await GoogleSignin.signOut();
     } catch (error) {
       console.error('Error signing out:', error);
@@ -105,12 +113,12 @@ export class AuthService {
 
   // Get current user
   static getCurrentUser(): User | null {
-    return auth.currentUser;
+    return typedAuth.currentUser;
   }
 
   // Listen to auth state changes
   static onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return firebaseOnAuthStateChanged(auth, callback);
+    return firebaseOnAuthStateChanged(typedAuth, callback);
   }
 
   // Check if user is authenticated and authorized

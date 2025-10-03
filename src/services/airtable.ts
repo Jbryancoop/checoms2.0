@@ -145,7 +145,7 @@ export class AirtableService {
         .firstPage();
 
       if (records.length === 0) {
-        throw new Error('Staff member not found');
+        throw new Error('Staff member not found in Leaders table');
       }
 
       // Check if UID field exists by trying to update it
@@ -165,7 +165,12 @@ export class AirtableService {
         }
       }
     } catch (error) {
-      console.error('Error updating UID:', error);
+      // Only log as error if it's not the expected "not found" case
+      if (error instanceof Error && error.message.includes('not found')) {
+        console.log('ℹ️ User not found in Leaders table (this is expected if user is in Users table)');
+      } else {
+        console.error('Error updating UID in Leaders table:', error);
+      }
       throw error;
     }
   }

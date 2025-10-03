@@ -10,13 +10,14 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
-  Image,
   Keyboard,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MessageService } from '../services/messageService';
 import { AuthService } from '../services/auth';
 import { AnyUser, Message } from '../types';
+import ProfileImage from '../components/ProfileImage';
 
 
 interface ConversationScreenProps {
@@ -32,6 +33,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   const [currentUser, setCurrentUser] = useState<AnyUser | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -58,10 +60,13 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', (e) => {
       setKeyboardHeight(e.endCoordinates.height);
-      // Scroll to bottom when keyboard appears
+      // Scroll to bottom when keyboard appears - multiple attempts for reliability
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 50);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 200);
     });
 
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
@@ -214,18 +219,11 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       </TouchableOpacity>
       
       <View style={styles.recipientInfo}>
-        <View style={styles.recipientImageContainer}>
-          {recipient.ProfilePic ? (
-            <Image 
-              source={{ uri: Array.isArray(recipient.ProfilePic) ? recipient.ProfilePic[0]?.url : recipient.ProfilePic }} 
-              style={styles.recipientImage}
-            />
-          ) : (
-            <View style={styles.defaultRecipientImage}>
-              <Ionicons name="person" size={20} color="#007AFF" />
-            </View>
-          )}
-        </View>
+        <ProfileImage
+          profilePic={recipient.ProfilePic}
+          size={40}
+          style={styles.recipientImageContainer}
+        />
         <View style={styles.recipientDetails}>
           <Text style={styles.recipientName}>{recipient['Full Name']}</Text>
           <Text style={styles.recipientStatus}>Online</Text>
@@ -252,32 +250,39 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
 
   return (
     <View style={styles.container}>
-      {renderHeader()}
-      
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        style={styles.messagesList}
-        contentContainerStyle={[
-          styles.messagesContent,
-          { paddingBottom: keyboardHeight > 0 ? 20 : 0 }
-        ]}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        showsVerticalScrollIndicator={false}
-      />
-      
-      <KeyboardAvoidingView 
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {renderHeader()}
+      </SafeAreaView>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={64} color="#c7c7cc" />
+              <Text style={styles.emptyText}>No messages yet</Text>
+              <Text style={styles.emptySubtext}>Start a conversation!</Text>
+            </View>
+          )}
+        />
+
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
             <TouchableOpacity style={styles.attachButton}>
               <Ionicons name="add" size={24} color="#007AFF" />
             </TouchableOpacity>
-            
+
             <TextInput
               style={styles.textInput}
               value={newMessage}
@@ -286,14 +291,21 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
               placeholderTextColor="#8e8e93"
               multiline
               maxLength={1000}
+              returnKeyType="send"
+              blurOnSubmit={false}
+              onSubmitEditing={() => {
+                if (newMessage.trim() && !isSending) {
+                  sendMessage();
+                }
+              }}
               onFocus={() => {
                 setTimeout(() => {
                   flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
+                }, 300);
               }}
             />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.sendButton,
                 (!newMessage.trim() || isSending) && styles.sendButtonDisabled
@@ -319,11 +331,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f2f2f7',
   },
+  safeArea: {
+    backgroundColor: '#f2f2f7',
+  },
+  keyboardAvoid: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f2f2f7',
-    paddingTop: 50,
+    paddingTop: 10,
     paddingBottom: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
@@ -378,6 +396,24 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     padding: 16,
+    flexGrow: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#8e8e93',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#c7c7cc',
+    marginTop: 8,
   },
   messageContainer: {
     marginBottom: 12,
@@ -440,10 +476,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: '#f2f2f7',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 8,
     borderTopWidth: 0.5,
     borderTopColor: '#c6c6c8',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12, // Account for home indicator on iOS
   },
   inputWrapper: {
     flexDirection: 'row',
