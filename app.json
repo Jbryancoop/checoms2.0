@@ -51,8 +51,9 @@
     "plugins": [],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "0be708cb-4698-481d-b6ba-cc79816f4023"
       }
-    }
+    },
+    "owner": "radius-technologies"
   }
 }

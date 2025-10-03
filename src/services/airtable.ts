@@ -175,9 +175,11 @@ export class AirtableService {
     }
   }
 
-  // Update staff push token (storing in a custom field or using Google ID field temporarily)
+  // Update staff push token
   static async updateStaffPushToken(email: string, pushToken: string): Promise<void> {
     try {
+      console.log('🔄 Updating push token for staff:', email);
+
       const records = await base(TABLES.LEADERS)
         .select({
           filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
@@ -189,17 +191,117 @@ export class AirtableService {
         throw new Error('Staff member not found');
       }
 
-      // For now, we'll store the push token in a comment or note field
-      // You may want to add a dedicated PushToken field to your Airtable base
-      console.log(`Push token for ${email}: ${pushToken}`);
-      
-      // TODO: Add a PushToken field to your Leaders table and update this code
-      // await base(TABLES.LEADERS).update(records[0].id, {
-      //   [FIELDS.LEADERS.PUSH_TOKEN]: pushToken,
-      // });
+      await base(TABLES.LEADERS).update(records[0].id, {
+        'Push Token': pushToken,
+      });
+
+      console.log('✅ Successfully updated push token for:', email);
     } catch (error) {
       console.error('Error updating push token:', error);
       throw error;
+    }
+  }
+
+  // Update user push token (in Users table)
+  static async updateUserPushToken(email: string, pushToken: string): Promise<void> {
+    try {
+      console.log('🔄 Updating push token for user:', email);
+
+      const records = await base(TABLES.USERS)
+        .select({
+          filterByFormula: `LOWER({Email}) = LOWER('${email}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        throw new Error('User not found');
+      }
+
+      await base(TABLES.USERS).update(records[0].id, {
+        'Push Token': pushToken,
+      });
+
+      console.log('✅ Successfully updated push token for user:', email);
+    } catch (error) {
+      console.error('Error updating user push token:', error);
+      throw error;
+    }
+  }
+
+  // Get all push tokens (from both tables)
+  static async getAllPushTokens(): Promise<string[]> {
+    try {
+      console.log('🔍 Fetching all push tokens...');
+      const tokens: string[] = [];
+
+      // Get tokens from Leaders table
+      const leaderRecords = await base(TABLES.LEADERS)
+        .select({
+          fields: ['Push Token'],
+        })
+        .all();
+
+      leaderRecords.forEach(record => {
+        const token = record.get('Push Token') as string;
+        if (token) tokens.push(token);
+      });
+
+      // Get tokens from Users table
+      try {
+        const userRecords = await base(TABLES.USERS)
+          .select({
+            fields: ['Push Token'],
+          })
+          .all();
+
+        userRecords.forEach(record => {
+          const token = record.get('Push Token') as string;
+          if (token) tokens.push(token);
+        });
+      } catch (error) {
+        console.warn('⚠️ Could not fetch tokens from Users table:', error);
+      }
+
+      console.log('✅ Found', tokens.length, 'push tokens');
+      return tokens;
+    } catch (error) {
+      console.error('Error fetching push tokens:', error);
+      throw error;
+    }
+  }
+
+  // Get push token for a specific user by UID
+  static async getPushTokenByUID(uid: string): Promise<string | null> {
+    try {
+      // Try Leaders table first
+      const leaderRecords = await base(TABLES.LEADERS)
+        .select({
+          filterByFormula: `{UID} = '${uid}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (leaderRecords.length > 0) {
+        return leaderRecords[0].get('Push Token') as string || null;
+      }
+
+      // Try Users table
+      const userRecords = await base(TABLES.USERS)
+        .select({
+          filterByFormula: `{UID} = '${uid}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (userRecords.length > 0) {
+        return userRecords[0].get('Push Token') as string || null;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error fetching push token by UID:', error);
+      return null;
     }
   }
 

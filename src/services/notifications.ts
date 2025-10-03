@@ -50,7 +50,7 @@ export class NotificationService {
 
       // Get push token
       const token = (await Notifications.getExpoPushTokenAsync()).data;
-      
+
       // Get current user
       const userWithStaff = await AuthService.getCurrentUserWithStaffInfo();
       if (!userWithStaff) {
@@ -58,17 +58,93 @@ export class NotificationService {
         return null;
       }
 
-      // Update push token in Airtable
-      await AirtableService.updateStaffPushToken(
-        userWithStaff.user.email!,
-        token
-      );
+      const email = userWithStaff.user.email!;
+      const userInfo = userWithStaff.userInfo;
 
-      console.log('Push token registered:', token);
+      // Determine if user is staff or regular user and update accordingly
+      if ('CHE Email' in userInfo) {
+        // This is a staff member (Leader)
+        console.log('📱 Registering push token for staff member:', email);
+        await AirtableService.updateStaffPushToken(email, token);
+      } else if ('Email' in userInfo) {
+        // This is a regular user
+        console.log('📱 Registering push token for user:', email);
+        await AirtableService.updateUserPushToken(email, token);
+      }
+
+      console.log('✅ Push token registered:', token);
       return token;
     } catch (error) {
-      console.error('Error registering for push notifications:', error);
+      console.error('❌ Error registering for push notifications:', error);
       return null;
+    }
+  }
+
+  // Send push notification to a specific user
+  static async sendPushNotification(
+    pushToken: string,
+    title: string,
+    body: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title,
+        body,
+        data,
+      };
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+
+      const result = await response.json();
+      console.log('📤 Push notification sent:', result);
+    } catch (error) {
+      console.error('❌ Error sending push notification:', error);
+      throw error;
+    }
+  }
+
+  // Send push notification to multiple tokens (for broadcasts)
+  static async sendBulkPushNotifications(
+    pushTokens: string[],
+    title: string,
+    body: string,
+    data?: any
+  ): Promise<void> {
+    try {
+      const messages = pushTokens.map(token => ({
+        to: token,
+        sound: 'default',
+        title,
+        body,
+        data,
+      }));
+
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messages),
+      });
+
+      const result = await response.json();
+      console.log(`📤 Sent ${pushTokens.length} push notifications:`, result);
+    } catch (error) {
+      console.error('❌ Error sending bulk push notifications:', error);
+      throw error;
     }
   }
 

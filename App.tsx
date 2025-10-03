@@ -6,10 +6,12 @@ import PreloadService from './src/services/preloadService';
 import AuthScreen from './src/screens/AuthScreen';
 import AppNavigator from './src/navigation/AppNavigator';
 import LoadingScreen from './src/screens/LoadingScreen';
+import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 
-export default function App() {
+function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const { colorScheme } = useTheme();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -25,9 +27,13 @@ export default function App() {
       const unsubscribe = AuthService.onAuthStateChanged(async (user) => {
         setIsAuthenticated(!!user);
 
-        // If user is authenticated, ensure data is preloaded
+        // If user is authenticated, ensure data is preloaded and register for push notifications
         if (user) {
           await PreloadService.preloadData();
+          // Register for push notifications
+          NotificationService.registerForPushNotifications().catch(err =>
+            console.error('Failed to register push token:', err)
+          );
         }
 
         setIsLoading(false);
@@ -61,12 +67,20 @@ export default function App() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       {isAuthenticated ? (
         <AppNavigator onLogout={handleLogout} />
       ) : (
         <AuthScreen onAuthSuccess={handleAuthSuccess} />
       )}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

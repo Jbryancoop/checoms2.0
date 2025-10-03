@@ -64,6 +64,9 @@ export class MessageService {
       // Update conversation
       await this.updateConversation(senderId, recipientId, content);
 
+      // Send push notification to recipient
+      await this.sendMessageNotification(recipientId, senderName, content);
+
       return docRef.id;
     } catch (error: any) {
       console.error('❌ ====== MESSAGE SEND FAILED ======');
@@ -472,6 +475,44 @@ export class MessageService {
     } catch (error) {
       console.error('❌ Error deleting message:', error);
       throw error;
+    }
+  }
+
+  // Send push notification when a message is received
+  private static async sendMessageNotification(
+    recipientId: string,
+    senderName: string,
+    messageContent: string
+  ): Promise<void> {
+    try {
+      console.log('📱 Sending push notification to recipient:', recipientId);
+
+      // Get recipient's push token from Airtable
+      const { AirtableService } = await import('./airtable');
+      const pushToken = await AirtableService.getPushTokenByUID(recipientId);
+
+      if (!pushToken) {
+        console.log('⚠️ No push token found for recipient:', recipientId);
+        return;
+      }
+
+      // Send notification
+      const { NotificationService } = await import('./notifications');
+      const truncatedMessage = messageContent.length > 100
+        ? messageContent.substring(0, 100) + '...'
+        : messageContent;
+
+      await NotificationService.sendPushNotification(
+        pushToken,
+        `New message from ${senderName}`,
+        truncatedMessage,
+        { type: 'message', senderId: recipientId }
+      );
+
+      console.log('✅ Push notification sent successfully');
+    } catch (error) {
+      console.error('❌ Error sending push notification:', error);
+      // Don't throw - notification failure shouldn't block message sending
     }
   }
 }
