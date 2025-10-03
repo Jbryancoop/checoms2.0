@@ -1,5 +1,5 @@
 import Airtable from 'airtable';
-import { StaffInfo, StaffUpdate, StaffMessage, Leader } from '../types';
+import { StaffInfo, StaffUpdate, StaffMessage, Leader, AppUser, AnyUser } from '../types';
 
 // Initialize Airtable
 console.log('🔧 Airtable API Key:', process.env.EXPO_PUBLIC_AIRTABLE_API_KEY ? 'Present' : 'Missing');
@@ -12,6 +12,7 @@ const base = new Airtable({
 // Table IDs from your CSV
 const TABLES = {
   STAFF_INFO: 'tblO65y2oxVPbROoU',
+  USERS: 'tblg4lVUqJavsmRTq', // Users table
   STAFF_UPDATES: 'tblJqbelzK03BNOwZ',
   STAFF_MESSAGES: 'tbl0VWPjWbDv1Cv4O',
   LEADERS: 'tblltaeQ2muGLvXcb',
@@ -52,6 +53,17 @@ const FIELDS = {
     PROFILE_PIC: 'fldn3PTlfulF0zgKs',
     UID: 'fldUID', // TODO: Replace with actual UID field ID from Airtable
   },
+  USERS: {
+    FULL_NAME: 'fld49XrNRSBQNAmTF',
+    FIRST_NAME: 'fldyOGxTRBHuxIQId',
+    LAST_NAME: 'fldo77pe5pVyNrTMN',
+    EMAIL: 'fld3d7CFrwAxT91Iq',
+    PHONE: 'fldseOi3k9E8hMunC',
+    USER_TYPE: 'fld2L6T7J5y1fwOse',
+    UID: 'fldFvsVcXayl0DZT4',
+    PROFILE_PIC: 'fldqCv9V2GsOXsYso',
+    ACTIVE: 'fldn7dYSupCY345Ew',
+  },
 };
 
 export class AirtableService {
@@ -64,7 +76,7 @@ export class AirtableService {
       
       const records = await base(TABLES.LEADERS)
         .select({
-          filterByFormula: `{CHE Email} = '${email}'`,
+          filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
         })
         .firstPage();
@@ -127,7 +139,7 @@ export class AirtableService {
       
       const records = await base(TABLES.LEADERS)
         .select({
-          filterByFormula: `{CHE Email} = '${email}'`,
+          filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
         })
         .firstPage();
@@ -163,7 +175,7 @@ export class AirtableService {
     try {
       const records = await base(TABLES.LEADERS)
         .select({
-          filterByFormula: `{CHE Email} = '${email}'`,
+          filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
         })
         .firstPage();
@@ -284,6 +296,157 @@ export class AirtableService {
     } catch (error) {
       console.error('Error sending staff message:', error);
       throw error;
+    }
+  }
+
+  // Get all staff members for directory
+  static async getAllStaff(): Promise<Leader[]> {
+    try {
+      console.log('🔍 Fetching all staff for directory...');
+      
+      const records = await base(TABLES.LEADERS)
+        .select({
+          sort: [{ field: 'Full Name', direction: 'asc' }],
+        })
+        .all();
+
+      console.log('🔍 Found staff records:', records.length);
+
+      const staff = records.map(record => ({
+        id: record.id,
+        'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
+        'Full Name': record.get('Full Name') as string,
+        'First Name': record.get('First Name') as string,
+        'Last Name': record.get('Last Name') as string,
+        'Google ID': record.get('Google ID') as string || '',
+        Phone: record.get('Phone') as string,
+        'Type of Campus': record.get('Type of Campus') as any,
+        'CHE Email': record.get('CHE Email') as string,
+        'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
+        ProfilePic: record.get('ProfilePic') as string,
+        UID: record.get('UID') as string || '',
+      }));
+
+      console.log('✅ Returning staff directory:', staff.length, 'members');
+      return staff;
+    } catch (error) {
+      console.error('Error fetching all staff:', error);
+      throw error;
+    }
+  }
+
+  // Get user by email from Users table
+  static async getUserByEmail(email: string): Promise<AppUser | null> {
+    try {
+      console.log('🔍 Fetching user by email:', email);
+      
+      const records = await base(TABLES.USERS)
+        .select({
+          filterByFormula: `LOWER({Email}) = LOWER('${email}')`,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        console.log('❌ No user found with email:', email);
+        return null;
+      }
+
+      const record = records[0];
+      console.log('🔍 Found user record:', record.id);
+
+      const user: AppUser = {
+        id: record.id,
+        'Full Name': record.get('Full Name') as string,
+        'First Name': record.get('First Name') as string,
+        'Last Name': record.get('Last Name') as string,
+        'Email': record.get('Email') as string,
+        'Phone': record.get('Phone') as string,
+        'User Type': record.get('User Type') as any,
+        'UID': record.get('UID') as string || '',
+        'ProfilePic': record.get('ProfilePic') as string | Array<{url: string}>,
+        'Active': record.get('Active') as boolean || true,
+      };
+
+      console.log('✅ Found user:', user);
+      return user;
+    } catch (error) {
+      // If the Users table doesn't exist yet, just return null instead of throwing
+      if (error.message?.includes('TABLE_NOT_FOUND') || error.message?.includes('NOT_FOUND')) {
+        console.log('⚠️ Users table does not exist yet, skipping user lookup');
+        return null;
+      }
+      console.error('Error fetching user by email:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Get any user (staff or regular user) by email
+  static async getAnyUserByEmail(email: string): Promise<AnyUser | null> {
+    try {
+      console.log('🔍 Searching for user in both tables:', email);
+      
+      // First try to find in Leaders table (staff)
+      const staff = await this.getStaffByEmail(email);
+      if (staff) {
+        console.log('✅ Found in Leaders table');
+        return staff;
+      }
+
+      // Then try to find in Users table
+      try {
+        const user = await this.getUserByEmail(email);
+        if (user) {
+          console.log('✅ Found in Users table');
+          return user;
+        }
+      } catch (userError) {
+        console.warn('⚠️ Error checking Users table, continuing with staff-only lookup:', userError.message);
+        // Don't throw here, just continue without the Users table
+      }
+
+      console.log('❌ User not found in any table');
+      return null;
+    } catch (error) {
+      console.error('Error fetching any user by email:', error);
+      throw error;
+    }
+  }
+
+  // Update user UID in Users table
+  static async updateUserUID(email: string, uid: string): Promise<void> {
+    try {
+      console.log('🔄 Updating UID for user email:', email);
+      
+      const records = await base(TABLES.USERS)
+        .select({
+          filterByFormula: `LOWER({Email}) = LOWER('${email}')`,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        console.log('❌ No user found to update UID');
+        return;
+      }
+
+      await base(TABLES.USERS).update(records[0].id, {
+        'UID': uid,
+      });
+
+      console.log('✅ Successfully updated user UID');
+    } catch (error) {
+      // If the Users table doesn't exist yet, just log and continue
+      if (error.message?.includes('TABLE_NOT_FOUND') || error.message?.includes('NOT_FOUND')) {
+        console.log('⚠️ Users table does not exist yet, skipping UID update');
+        return;
+      }
+      if (error.message?.includes('UNKNOWN_FIELD_NAME')) {
+        console.warn('⚠️ UID field does not exist in Users table yet. Please add the UID field to your Users table.');
+        console.warn('⚠️ Field ID should be:', FIELDS.USERS.UID);
+      } else {
+        console.error('Error updating user UID:', error);
+        throw error;
+      }
     }
   }
 

@@ -43,6 +43,23 @@ export interface Leader {
   UID?: string; // Firebase UID
 }
 
+// General User Types (for Users table)
+export interface AppUser {
+  id: string;
+  'Full Name': string;
+  'First Name': string;
+  'Last Name': string;
+  'Email': string;
+  'Phone': string;
+  'User Type': 'Staff' | 'Parent' | 'Student' | 'Volunteer' | 'Admin';
+  'UID'?: string; // Firebase UID
+  'ProfilePic'?: string | Array<{url: string}>;
+  'Active'?: boolean;
+}
+
+// Union type for all user types
+export type AnyUser = Leader | AppUser;
+
 // Navigation Types
 export type RootTabParamList = {
   Updates: undefined;

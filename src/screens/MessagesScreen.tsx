@@ -120,6 +120,7 @@ export default function MessagesScreen() {
 
   const renderMessage = ({ item }: { item: StaffMessage }) => {
     const isFromCurrentUser = item.SenderEmail === currentUserEmail;
+    const senderName = item.SenderEmail ? item.SenderEmail.split('@')[0] : 'Unknown';
     
     return (
       <View style={[
@@ -128,7 +129,7 @@ export default function MessagesScreen() {
       ]}>
         <View style={styles.messageHeader}>
           <Text style={styles.senderEmail}>
-            {isFromCurrentUser ? 'You' : item.SenderEmail.split('@')[0]}
+            {isFromCurrentUser ? 'You' : senderName}
           </Text>
           <Text style={styles.timestamp}>
             {formatTimestamp(item.Timestamp)}

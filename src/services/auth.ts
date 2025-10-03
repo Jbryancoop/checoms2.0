@@ -8,7 +8,7 @@ import {
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth } from './firebase';
 import { AirtableService } from './airtable';
-import { Leader } from '../types';
+import { Leader, AppUser, AnyUser } from '../types';
 
 export class AuthService {
   // Configure Google Sign-In
@@ -26,7 +26,7 @@ export class AuthService {
   }
 
   // Sign in with Google using native Google Sign-In
-  static async signInWithGoogle(): Promise<{ user: User; staffInfo: Leader } | null> {
+  static async signInWithGoogle(): Promise<{ user: User; userInfo: AnyUser } | null> {
     try {
       // Check if your device supports Google Play
       await GoogleSignin.hasPlayServices();
@@ -58,27 +58,34 @@ export class AuthService {
         throw new Error('Email domain not authorized. Only @che.school and @ventureoff.org emails are allowed.');
       }
 
-      // Get staff info from Airtable
-      console.log('🔍 About to call AirtableService.getStaffByEmail with:', user.email);
-      const staffInfo = await AirtableService.getStaffByEmail(user.email);
-      console.log('🔍 AirtableService.getStaffByEmail result:', staffInfo);
+      // Get user info from Airtable (check both Staff and Users tables)
+      console.log('🔍 About to call AirtableService.getAnyUserByEmail with:', user.email);
+      const userInfo = await AirtableService.getAnyUserByEmail(user.email);
+      console.log('🔍 AirtableService.getAnyUserByEmail result:', userInfo);
       
-      if (!staffInfo) {
-        console.log('❌ No staff info found, signing out...');
+      if (!userInfo) {
+        console.log('❌ No user info found, signing out...');
         await this.signOut();
-        throw new Error('Email not found in staff database. Please contact your administrator.');
+        throw new Error('Email not found in user database. Please contact your administrator.');
       }
 
-      // Update the UID in Airtable
+      // Update the UID in Airtable (try both tables)
       try {
+        // Try to update in Leaders table first
         await AirtableService.updateStaffUID(user.email, user.uid);
-        console.log('✅ Successfully updated UID in Airtable');
+        console.log('✅ Successfully updated UID in Leaders table');
       } catch (error) {
-        console.warn('⚠️ Failed to update UID in Airtable:', error);
-        // Don't fail the authentication if UID update fails
+        console.warn('⚠️ Failed to update UID in Leaders table, trying Users table:', error);
+        try {
+          await AirtableService.updateUserUID(user.email, user.uid);
+          console.log('✅ Successfully updated UID in Users table');
+        } catch (userError) {
+          console.warn('⚠️ Failed to update UID in Users table:', userError);
+          // Don't fail the authentication if UID update fails
+        }
       }
 
-      return { user, staffInfo };
+      return { user, userInfo };
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
@@ -107,17 +114,17 @@ export class AuthService {
   }
 
   // Check if user is authenticated and authorized
-  static async getCurrentUserWithStaffInfo(): Promise<{ user: User; staffInfo: Leader } | null> {
+  static async getCurrentUserWithStaffInfo(): Promise<{ user: User; userInfo: AnyUser } | null> {
     const user = this.getCurrentUser();
     if (!user || !user.email) return null;
 
     try {
-      const staffInfo = await AirtableService.getStaffByEmail(user.email);
-      if (!staffInfo) return null;
+      const userInfo = await AirtableService.getAnyUserByEmail(user.email);
+      if (!userInfo) return null;
 
-      return { user, staffInfo };
+      return { user, userInfo };
     } catch (error) {
-      console.error('Error getting current user with staff info:', error);
+      console.error('Error getting current user with user info:', error);
       return null;
     }
   }

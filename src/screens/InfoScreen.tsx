@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DirectoryScreen from './DirectoryScreen';
+import CalendarScreen from './CalendarScreen';
 
 interface InfoCard {
   id: string;
@@ -16,13 +18,16 @@ interface InfoCard {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   action?: {
-    type: 'link' | 'email' | 'phone';
+    type: 'link' | 'email' | 'phone' | 'directory' | 'calendar';
     value: string;
     label: string;
   };
 }
 
 export default function InfoScreen() {
+  const [showDirectory, setShowDirectory] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+
   const infoCards: InfoCard[] = [
     {
       id: '1',
@@ -31,7 +36,7 @@ export default function InfoScreen() {
       icon: 'book',
       action: {
         type: 'link',
-        value: 'https://docs.google.com/document/d/your-handbook-link',
+        value: 'https://docs.google.com/document/d/1j0fFOi0aX5ksHT-EPU-1byqX6Fr-griMTONlEYP2D8o/edit?usp=sharing',
         label: 'Open Handbook',
       },
     },
@@ -41,8 +46,8 @@ export default function InfoScreen() {
       description: 'Important dates, deadlines, and events for the current academic year.',
       icon: 'calendar',
       action: {
-        type: 'link',
-        value: 'https://calendar.google.com/calendar/embed?src=your-calendar-id',
+        type: 'calendar',
+        value: 'calendar',
         label: 'View Calendar',
       },
     },
@@ -53,29 +58,18 @@ export default function InfoScreen() {
       icon: 'help-circle',
       action: {
         type: 'email',
-        value: 'tech-support@che.school',
+        value: 'Help@che.school',
         label: 'Contact Tech Support',
-      },
-    },
-    {
-      id: '4',
-      title: 'Emergency Contacts',
-      description: 'Important emergency contact information for immediate assistance.',
-      icon: 'call',
-      action: {
-        type: 'phone',
-        value: 'tel:+1234567890',
-        label: 'Emergency Line',
       },
     },
     {
       id: '5',
       title: 'Campus Directory',
-      description: 'Directory of all CHE campuses and their contact information.',
+      description: 'Directory of all CHE staff members with contact information.',
       icon: 'location',
       action: {
-        type: 'link',
-        value: 'https://che.school/campuses',
+        type: 'directory',
+        value: 'directory',
         label: 'View Directory',
       },
     },
@@ -99,6 +93,12 @@ export default function InfoScreen() {
           break;
         case 'phone':
           await Linking.openURL(action.value);
+          break;
+        case 'directory':
+          setShowDirectory(true);
+          break;
+        case 'calendar':
+          setShowCalendar(true);
           break;
       }
     } catch (error) {
@@ -129,6 +129,14 @@ export default function InfoScreen() {
       )}
     </View>
   );
+
+  if (showDirectory) {
+    return <DirectoryScreen onBack={() => setShowDirectory(false)} />;
+  }
+
+  if (showCalendar) {
+    return <CalendarScreen onBack={() => setShowCalendar(false)} />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>

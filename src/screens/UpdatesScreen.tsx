@@ -55,11 +55,23 @@ export default function UpdatesScreen() {
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) {
+        return 'Today';
+      } else if (diffDays === 1) {
+        return 'Yesterday';
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        });
+      }
     } catch {
       return dateString;
     }
@@ -71,13 +83,14 @@ export default function UpdatesScreen() {
   };
 
   const renderUpdate = ({ item }: { item: StaffUpdate }) => {
+    console.log('🎨 Rendering update card for:', item.Title);
     const imageUrl = getImageUrl(item);
     
     return (
       <TouchableOpacity 
-        style={styles.updateCard} 
         onPress={() => handleUpdatePress(item)}
-        activeOpacity={0.7}
+        activeOpacity={0.95}
+        style={styles.updateCard}
       >
         {imageUrl && (
           <Image source={{ uri: imageUrl }} style={styles.cardImage} />
@@ -99,17 +112,45 @@ export default function UpdatesScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyStateText}>No updates available</Text>
+      <Ionicons name="newspaper-outline" size={64} color="#c7c7cc" />
+      <Text style={styles.emptyStateText}>No updates yet</Text>
       <Text style={styles.emptyStateSubtext}>
-        Pull down to refresh and check for new updates
+        Check back later for important announcements and updates
       </Text>
+      <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+        <Ionicons name="refresh" size={16} color="#007AFF" />
+        <Text style={styles.refreshButtonText}>Refresh</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderSkeletonCard = () => (
+    <View style={[styles.updateCard, styles.skeletonCard]}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.cardContent}>
+        <View style={styles.skeletonTitle} />
+        <View style={styles.skeletonDate} />
+        <View style={styles.skeletonDescription} />
+        <View style={[styles.skeletonDescription, { width: '60%' }]} />
+        <View style={styles.cardFooter}>
+          <View style={styles.skeletonReadMore} />
+          <View style={styles.skeletonChevron} />
+        </View>
+      </View>
     </View>
   );
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading updates...</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Updates</Text>
+        </View>
+        <View style={styles.listContainer}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <View key={index}>{renderSkeletonCard()}</View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -123,6 +164,9 @@ export default function UpdatesScreen() {
     );
   }
 
+  console.log('📱 UpdatesScreen render - updates count:', updates.length);
+  console.log('📱 UpdatesScreen render - updates data:', updates);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -135,6 +179,7 @@ export default function UpdatesScreen() {
         renderItem={renderUpdate}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
+        style={styles.flatListStyle}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -148,7 +193,10 @@ export default function UpdatesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: '#e5e5ea',
+  },
+  flatListStyle: {
+    backgroundColor: '#e5e5ea',
   },
   header: {
     backgroundColor: '#007AFF',
@@ -172,31 +220,38 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   listContainer: {
-    paddingTop: 8,
+    paddingTop: 16,
     paddingBottom: 32,
+    paddingHorizontal: 16,
   },
   updateCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 12,
-    marginHorizontal: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    overflow: 'hidden',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e5e5ea',
+  },
+  updateCardPressed: {
+    transform: [{ scale: 0.98 }],
+    shadowOpacity: 0.12,
   },
   cardImage: {
     width: '100%',
     height: 150,
     backgroundColor: '#e0e0e0',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   cardContent: {
-    padding: 16,
+    padding: 20,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -210,23 +265,27 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   updateTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '600',
     color: '#000',
-    marginBottom: 4,
-    lineHeight: 22,
+    marginBottom: 6,
+    lineHeight: 24,
+    letterSpacing: -0.2,
   },
   updateDate: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#8e8e93',
-    marginBottom: 8,
-    fontWeight: '400',
+    marginBottom: 12,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   updateDescription: {
     fontSize: 16,
-    color: '#000',
-    lineHeight: 22,
+    color: '#1c1c1e',
+    lineHeight: 24,
     fontWeight: '400',
+    letterSpacing: -0.1,
   },
   emptyState: {
     flex: 1,
@@ -241,7 +300,68 @@ const styles = StyleSheet.create({
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#8e8e93',
     textAlign: 'center',
+    marginBottom: 24,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f2f2f7',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e5ea',
+  },
+  refreshButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  // Skeleton styles
+  skeletonCard: {
+    backgroundColor: '#f8f9fa',
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#e9ecef',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  skeletonTitle: {
+    height: 20,
+    backgroundColor: '#e9ecef',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '80%',
+  },
+  skeletonDate: {
+    height: 14,
+    backgroundColor: '#e9ecef',
+    borderRadius: 4,
+    marginBottom: 12,
+    width: '40%',
+  },
+  skeletonDescription: {
+    height: 16,
+    backgroundColor: '#e9ecef',
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '100%',
+  },
+  skeletonReadMore: {
+    height: 14,
+    backgroundColor: '#e9ecef',
+    borderRadius: 4,
+    width: 80,
+  },
+  skeletonChevron: {
+    height: 14,
+    width: 14,
+    backgroundColor: '#e9ecef',
+    borderRadius: 2,
   },
 });

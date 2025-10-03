@@ -11,32 +11,32 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/auth';
-import { Leader } from '../types';
+import { Leader, AppUser, AnyUser } from '../types';
 
 interface ProfileScreenProps {
   onLogout: () => void;
 }
 
 export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
-  const [staffInfo, setStaffInfo] = useState<Leader | null>(null);
+  const [userInfo, setUserInfo] = useState<AnyUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadStaffInfo();
+    loadUserInfo();
   }, []);
 
-  const loadStaffInfo = async () => {
+  const loadUserInfo = async () => {
     try {
       setIsLoading(true);
       const authResult = await AuthService.getCurrentUserWithStaffInfo();
       if (authResult) {
-        console.log('📸 ProfilePic data:', authResult.staffInfo.ProfilePic);
-        console.log('📸 ProfilePic type:', typeof authResult.staffInfo.ProfilePic);
-        console.log('📸 ProfilePic is array:', Array.isArray(authResult.staffInfo.ProfilePic));
-        setStaffInfo(authResult.staffInfo);
+        console.log('📸 ProfilePic data:', authResult.userInfo.ProfilePic);
+        console.log('📸 ProfilePic type:', typeof authResult.userInfo.ProfilePic);
+        console.log('📸 ProfilePic is array:', Array.isArray(authResult.userInfo.ProfilePic));
+        setUserInfo(authResult.userInfo);
       }
     } catch (error) {
-      console.error('Error loading staff info:', error);
+      console.error('Error loading user info:', error);
       Alert.alert('Error', 'Failed to load profile information');
     } finally {
       setIsLoading(false);
@@ -78,12 +78,12 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
     );
   }
 
-  if (!staffInfo) {
+  if (!userInfo) {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="person-circle-outline" size={64} color="#999" />
         <Text style={styles.errorText}>Unable to load profile information</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadStaffInfo}>
+        <TouchableOpacity style={styles.retryButton} onPress={loadUserInfo}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -95,9 +95,9 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
       {/* Profile Header */}
       <View style={styles.header}>
         <View style={styles.profileImageContainer}>
-          {staffInfo.ProfilePic ? (
+          {userInfo.ProfilePic ? (
             <Image 
-              source={{ uri: Array.isArray(staffInfo.ProfilePic) ? staffInfo.ProfilePic[0]?.url : staffInfo.ProfilePic }} 
+              source={{ uri: Array.isArray(userInfo.ProfilePic) ? userInfo.ProfilePic[0]?.url : userInfo.ProfilePic }} 
               style={styles.profileImage}
               onError={() => console.log('Failed to load profile image')}
             />
@@ -107,7 +107,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
             </View>
           )}
         </View>
-        <Text style={styles.name}>{staffInfo['Full Name']}</Text>
+        <Text style={styles.name}>{userInfo['Full Name']}</Text>
       </View>
 
       {/* Profile Information */}
@@ -116,7 +116,9 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
           <Ionicons name="mail" size={20} color="#007AFF" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>{staffInfo['CHE Email']}</Text>
+            <Text style={styles.infoValue}>
+              {'CHE Email' in userInfo ? userInfo['CHE Email'] : userInfo['Email']}
+            </Text>
           </View>
         </View>
 
@@ -124,24 +126,28 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
           <Ionicons name="call" size={20} color="#007AFF" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Phone</Text>
-            <Text style={styles.infoValue}>{staffInfo.Phone}</Text>
+            <Text style={styles.infoValue}>{userInfo.Phone}</Text>
           </View>
         </View>
 
         <View style={styles.infoItem}>
           <Ionicons name="business" size={20} color="#007AFF" />
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Campus Type</Text>
-            <Text style={styles.infoValue}>{staffInfo['Type of Campus']}</Text>
+            <Text style={styles.infoLabel}>
+              {'Type of Campus' in userInfo ? 'Campus Type' : 'User Type'}
+            </Text>
+            <Text style={styles.infoValue}>
+              {'Type of Campus' in userInfo ? userInfo['Type of Campus'] : userInfo['User Type']}
+            </Text>
           </View>
         </View>
 
-        {staffInfo['Campus Director'] && staffInfo['Campus Director'].length > 0 && (
+        {'Campus Director' in userInfo && userInfo['Campus Director'] && userInfo['Campus Director'].length > 0 && (
           <View style={styles.infoItem}>
             <Ionicons name="people" size={20} color="#007AFF" />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Campus Director</Text>
-              <Text style={styles.infoValue}>{staffInfo['Campus Director'].join(', ')}</Text>
+              <Text style={styles.infoValue}>{userInfo['Campus Director'].join(', ')}</Text>
             </View>
           </View>
         )}
