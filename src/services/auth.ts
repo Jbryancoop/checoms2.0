@@ -1,12 +1,12 @@
-import { 
-  GoogleAuthProvider, 
-  signInWithCredential, 
-  signOut, 
-  onAuthStateChanged,
+import { auth } from './firebase';
+import {
+  signInWithCredential,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
   User
 } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { auth } from './firebase';
 import { AirtableService } from './airtable';
 import { Leader, AppUser, AnyUser } from '../types';
 
@@ -28,24 +28,24 @@ export class AuthService {
   // Sign in with Google using native Google Sign-In
   static async signInWithGoogle(): Promise<{ user: User; userInfo: AnyUser } | null> {
     try {
-      // Check if your device supports Google Play
+      // Check if your device supports Google Play (required for Google Sign-In)
       await GoogleSignin.hasPlayServices();
-      
+
       // Get the users ID token
       const signInResult = await GoogleSignin.signIn();
       const idToken = signInResult.data?.idToken;
-      
+
       if (!idToken) {
         throw new Error('No ID token found from Google Sign-In');
       }
 
       // Create a Google credential with the token
       const googleCredential = GoogleAuthProvider.credential(idToken);
-      
+
       // Sign-in the user with the credential
       const result = await signInWithCredential(auth, googleCredential);
       const user = result.user;
-      
+
       if (!user.email) {
         throw new Error('No email found in Google account');
       }
@@ -62,7 +62,7 @@ export class AuthService {
       console.log('🔍 About to call AirtableService.getAnyUserByEmail with:', user.email);
       const userInfo = await AirtableService.getAnyUserByEmail(user.email);
       console.log('🔍 AirtableService.getAnyUserByEmail result:', userInfo);
-      
+
       if (!userInfo) {
         console.log('❌ No user info found, signing out...');
         await this.signOut();
@@ -95,7 +95,7 @@ export class AuthService {
   // Sign out
   static async signOut(): Promise<void> {
     try {
-      await signOut(auth);
+      await firebaseSignOut(auth);
       await GoogleSignin.signOut();
     } catch (error) {
       console.error('Error signing out:', error);
@@ -110,7 +110,7 @@ export class AuthService {
 
   // Listen to auth state changes
   static onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return onAuthStateChanged(auth, callback);
+    return firebaseOnAuthStateChanged(auth, callback);
   }
 
   // Check if user is authenticated and authorized

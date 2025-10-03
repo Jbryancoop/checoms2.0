@@ -18,6 +18,30 @@ export interface StaffUpdate {
   image?: string | Array<{url: string}>;
 }
 
+// Message Types
+export interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderEmail: string;
+  recipientId: string;
+  recipientName: string;
+  recipientEmail: string;
+  content: string;
+  timestamp: string;
+  status: 'sending' | 'sent' | 'delivered' | 'read';
+  isFromCurrentUser: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  recipient: AnyUser;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isOnline: boolean;
+}
+
 // Staff Messages Types
 export interface StaffMessage {
   id: string;

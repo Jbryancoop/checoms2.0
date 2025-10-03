@@ -335,6 +335,40 @@ export class AirtableService {
     }
   }
 
+  // Get all users from Users table
+  static async getAllUsers(): Promise<AppUser[]> {
+    try {
+      console.log('🔍 Fetching all users from Users table...');
+      
+      const records = await base(TABLES.USERS)
+        .select({
+          sort: [{ field: 'Full Name', direction: 'asc' }],
+        })
+        .all();
+
+      console.log('🔍 Found user records:', records.length);
+
+      const users = records.map(record => ({
+        id: record.id,
+        'Full Name': record.get('Full Name') as string,
+        'First Name': record.get('First Name') as string,
+        'Last Name': record.get('Last Name') as string,
+        'Email': record.get('Email') as string,
+        'Phone': record.get('Phone') as string,
+        'User Type': record.get('User Type') as any,
+        'UID': record.get('UID') as string || '',
+        'ProfilePic': record.get('ProfilePic') as string | Array<{url: string}>,
+        'Active': record.get('Active') as boolean || true,
+      }));
+
+      console.log('✅ Returning users:', users.length, 'members');
+      return users;
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      throw error;
+    }
+  }
+
   // Get user by email from Users table
   static async getUserByEmail(email: string): Promise<AppUser | null> {
     try {
@@ -377,6 +411,81 @@ export class AirtableService {
       }
       console.error('Error fetching user by email:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Get user by ID from both tables
+  static async getUserById(userId: string): Promise<AnyUser | null> {
+    try {
+      console.log('🔍 Fetching user by ID:', userId);
+      
+      // First try to find in Leaders table
+      try {
+        const leaderRecords = await base(TABLES.LEADERS)
+          .select({
+            filterByFormula: `{UID} = '${userId}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (leaderRecords.length > 0) {
+          const record = leaderRecords[0];
+          const leader: Leader = {
+            id: record.id,
+            'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
+            'Full Name': record.get('Full Name') as string,
+            'First Name': record.get('First Name') as string,
+            'Last Name': record.get('Last Name') as string,
+            'Google ID': record.get('Google ID') as string || '',
+            Phone: record.get('Phone') as string,
+            'Type of Campus': record.get('Type of Campus') as any,
+            'CHE Email': record.get('CHE Email') as string,
+            'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
+            ProfilePic: record.get('ProfilePic') as string | Array<{url: string}>,
+            UID: record.get('UID') as string || '',
+          };
+          console.log('✅ Found user in Leaders table:', leader);
+          return leader;
+        }
+      } catch (leaderError) {
+        console.log('⚠️ Error checking Leaders table:', leaderError);
+      }
+
+      // Then try to find in Users table
+      try {
+        const userRecords = await base(TABLES.USERS)
+          .select({
+            filterByFormula: `{UID} = '${userId}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (userRecords.length > 0) {
+          const record = userRecords[0];
+          const user: AppUser = {
+            id: record.id,
+            'Full Name': record.get('Full Name') as string,
+            'First Name': record.get('First Name') as string,
+            'Last Name': record.get('Last Name') as string,
+            'Email': record.get('Email') as string,
+            'Phone': record.get('Phone') as string,
+            'User Type': record.get('User Type') as any,
+            'UID': record.get('UID') as string || '',
+            'ProfilePic': record.get('ProfilePic') as string | Array<{url: string}>,
+            'Active': record.get('Active') as boolean || true,
+          };
+          console.log('✅ Found user in Users table:', user);
+          return user;
+        }
+      } catch (userError) {
+        console.log('⚠️ Error checking Users table:', userError);
+      }
+
+      console.log('❌ No user found with UID:', userId);
+      return null;
+    } catch (error) {
+      console.error('Error fetching user by ID:', error);
       throw error;
     }
   }

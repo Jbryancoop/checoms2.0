@@ -48,9 +48,7 @@
       "icon": "./assets/icon.png",
       "color": "#007AFF"
     },
-    "plugins": [
-      "@react-native-google-signin/google-signin"
-    ],
+    "plugins": [],
     "extra": {
       "eas": {
         "projectId": "your-eas-project-id"

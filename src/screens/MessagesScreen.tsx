@@ -1,239 +1,259 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  TextInput,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
   RefreshControl,
-  Modal,
+  Image,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { StaffMessage, RecipientGroup } from '../types';
-import { AirtableService } from '../services/airtable';
+import { Ionicons } from '@expo/vector-icons';
+import { MessageService } from '../services/messageService';
 import { AuthService } from '../services/auth';
+import { AnyUser, Conversation } from '../types';
+import UserSelectionScreen from './UserSelectionScreen';
+import ConversationScreen from './ConversationScreen';
 
 export default function MessagesScreen() {
-  const [messages, setMessages] = useState<StaffMessage[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [selectedRecipient, setSelectedRecipient] = useState<RecipientGroup>('Coordinator');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
-
-  const recipientOptions: { label: string; value: RecipientGroup }[] = [
-    { label: 'Coordinator', value: 'Coordinator' },
-    { label: 'Director', value: 'Director' },
-    { label: 'Tech', value: 'Tech' },
-  ];
-
-  const loadMessages = useCallback(async () => {
-    try {
-      const staffMessages = await AirtableService.getStaffMessages();
-      setMessages(staffMessages);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      Alert.alert('Error', 'Failed to load messages. Please try again.');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+  const [showUserSelection, setShowUserSelection] = useState(false);
+  const [selectedRecipient, setSelectedRecipient] = useState<AnyUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AnyUser | null>(null);
 
   useEffect(() => {
-    loadMessages();
-    
-    // Get current user email
-    const getCurrentUser = async () => {
-      const userWithStaff = await AuthService.getCurrentUserWithStaffInfo();
-      if (userWithStaff?.user.email) {
-        setCurrentUserEmail(userWithStaff.user.email);
-      }
-    };
-    getCurrentUser();
-  }, [loadMessages]);
+    loadCurrentUser();
+    loadConversations();
+  }, []);
 
-  const onRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    loadMessages();
-  }, [loadMessages]);
-
-  const sendMessage = async () => {
-    if (!newMessage.trim()) {
-      Alert.alert('Error', 'Please enter a message');
-      return;
-    }
-
-    if (!currentUserEmail) {
-      Alert.alert('Error', 'User email not found');
-      return;
-    }
-
+  const loadCurrentUser = async () => {
     try {
-      setIsSending(true);
-      await AirtableService.sendStaffMessage(
-        currentUserEmail,
-        selectedRecipient,
-        newMessage.trim()
-      );
-      
-      setNewMessage('');
-      Alert.alert('Success', 'Message sent successfully!');
-      
-      // Refresh messages
-      await loadMessages();
+      const authResult = await AuthService.getCurrentUserWithStaffInfo();
+      if (authResult) {
+        setCurrentUser(authResult.userInfo);
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
-      setIsSending(false);
+      console.error('Error loading current user:', error);
     }
   };
 
-  const formatTimestamp = (timestamp: string) => {
+  const loadConversations = async () => {
     try {
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-      if (diffInHours < 1) {
-        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-        return `${diffInMinutes}m ago`;
-      } else if (diffInHours < 24) {
-        return `${Math.floor(diffInHours)}h ago`;
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+      setIsLoading(true);
+      
+      if (!currentUser?.UID) {
+        console.log('No current user UID available, using mock data');
+        // Use mock data for now
+        const mockConversations: Conversation[] = [
+          {
+            id: '1',
+            recipient: {
+              id: 'user1',
+              'Full Name': 'Sarah Johnson',
+              'First Name': 'Sarah',
+              'Last Name': 'Johnson',
+              'Email': 'sarah.johnson@che.school',
+              'Phone': '(555) 123-4567',
+              'User Type': 'Staff',
+              'UID': 'uid1',
+              'ProfilePic': undefined,
+              'Active': true,
+            },
+            lastMessage: 'Thanks for the update on the project!',
+            lastMessageTime: new Date(Date.now() - 300000).toISOString(),
+            unreadCount: 2,
+            isOnline: true,
+          },
+          {
+            id: '2',
+            recipient: {
+              id: 'user2',
+              'Full Name': 'Mike Chen',
+              'First Name': 'Mike',
+              'Last Name': 'Chen',
+              'Email': 'mike.chen@che.school',
+              'Phone': '(555) 234-5678',
+              'User Type': 'Admin',
+              'UID': 'uid2',
+              'ProfilePic': undefined,
+              'Active': true,
+            },
+            lastMessage: 'Can we schedule a meeting for tomorrow?',
+            lastMessageTime: new Date(Date.now() - 1800000).toISOString(),
+            unreadCount: 0,
+            isOnline: false,
+          },
+        ];
+        setConversations(mockConversations);
+        setIsLoading(false);
+        return;
       }
-    } catch {
-      return timestamp;
+
+      const conversations = await MessageService.getConversations(currentUser.UID);
+      setConversations(conversations);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      Alert.alert('Error', 'Failed to load conversations');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const renderMessage = ({ item }: { item: StaffMessage }) => {
-    const isFromCurrentUser = item.SenderEmail === currentUserEmail;
-    const senderName = item.SenderEmail ? item.SenderEmail.split('@')[0] : 'Unknown';
-    
-    return (
-      <View style={[
-        styles.messageContainer,
-        isFromCurrentUser ? styles.currentUserMessage : styles.otherUserMessage
-      ]}>
-        <View style={styles.messageHeader}>
-          <Text style={styles.senderEmail}>
-            {isFromCurrentUser ? 'You' : senderName}
-          </Text>
-          <Text style={styles.timestamp}>
-            {formatTimestamp(item.Timestamp)}
-          </Text>
-        </View>
-        <Text style={styles.messageText}>{item.Message}</Text>
-        <Text style={styles.recipientText}>To: {item.RecipientGroup}</Text>
-      </View>
-    );
+  const onRefresh = async () => {
+    setIsRefreshing(true);
+    await loadConversations();
+    setIsRefreshing(false);
   };
+
+  const handleNewMessage = () => {
+    setShowUserSelection(true);
+  };
+
+  const handleUserSelect = (user: AnyUser) => {
+    setSelectedRecipient(user);
+    setShowUserSelection(false);
+  };
+
+  const handleBackFromConversation = () => {
+    setSelectedRecipient(null);
+    // Refresh conversations when coming back
+    loadConversations();
+  };
+
+  const formatLastMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 1) {
+      return 'now';
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else if (diffInHours < 168) { // 7 days
+      return `${Math.floor(diffInHours / 24)}d ago`;
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const renderConversation = ({ item }: { item: Conversation }) => (
+    <TouchableOpacity
+      style={styles.conversationCard}
+      onPress={() => setSelectedRecipient(item.recipient)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.conversationInfo}>
+        <View style={styles.avatarContainer}>
+          {item.recipient.ProfilePic ? (
+            <Image 
+              source={{ 
+                uri: Array.isArray(item.recipient.ProfilePic) 
+                  ? item.recipient.ProfilePic[0]?.url 
+                  : item.recipient.ProfilePic 
+              }} 
+              style={styles.avatar}
+              onError={() => console.log('Failed to load profile image')}
+            />
+          ) : (
+            <View style={styles.defaultAvatar}>
+              <Ionicons name="person" size={20} color="#007AFF" />
+            </View>
+          )}
+          {item.isOnline && <View style={styles.onlineIndicator} />}
+        </View>
+        
+        <View style={styles.conversationDetails}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.recipientName}>{item.recipient['Full Name']}</Text>
+            <Text style={styles.lastMessageTime}>{formatLastMessageTime(item.lastMessageTime)}</Text>
+          </View>
+          <View style={styles.conversationFooter}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyStateText}>No messages yet</Text>
+      <Ionicons name="chatbubbles-outline" size={64} color="#c7c7cc" />
+      <Text style={styles.emptyStateText}>No conversations yet</Text>
       <Text style={styles.emptyStateSubtext}>
-        Send a message to get started
+        Start a conversation by tapping the compose button
       </Text>
+      <TouchableOpacity style={styles.newMessageButton} onPress={handleNewMessage}>
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text style={styles.newMessageButtonText}>New Message</Text>
+      </TouchableOpacity>
     </View>
   );
 
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Text style={styles.headerTitle}>Messages</Text>
+      <TouchableOpacity style={styles.composeButton} onPress={handleNewMessage}>
+        <Ionicons name="create-outline" size={24} color="#007AFF" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (showUserSelection) {
+    return (
+      <UserSelectionScreen
+        onBack={() => setShowUserSelection(false)}
+        onUserSelect={handleUserSelect}
+      />
+    );
+  }
+
+  if (selectedRecipient) {
+    return (
+      <ConversationScreen
+        recipient={selectedRecipient}
+        onBack={handleBackFromConversation}
+      />
+    );
+  }
+
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading messages...</Text>
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading conversations...</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {renderHeader()}
+      
       <FlatList
-        data={messages}
-        renderItem={renderMessage}
+        data={conversations}
+        renderItem={renderConversation}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.messagesList}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
-        inverted
       />
-
-      <View style={styles.inputContainer}>
-        <TouchableOpacity
-          style={styles.recipientButton}
-          onPress={() => setShowPicker(true)}
-        >
-          <Text style={styles.recipientButtonText}>To: {selectedRecipient}</Text>
-          <Text style={styles.recipientArrow}>▼</Text>
-        </TouchableOpacity>
-
-        <View style={styles.messageInputContainer}>
-          <TextInput
-            style={styles.messageInput}
-            placeholder="Type your message..."
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!newMessage.trim() || isSending) && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!newMessage.trim() || isSending}
-          >
-            <Text style={styles.sendButtonText}>
-              {isSending ? 'Sending...' : 'Send'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <Modal
-        visible={showPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Recipient</Text>
-            <Picker
-              selectedValue={selectedRecipient}
-              onValueChange={(value) => setSelectedRecipient(value)}
-              style={styles.picker}
-            >
-              {recipientOptions.map((option) => (
-                <Picker.Item
-                  key={option.value}
-                  label={option.label}
-                  value={option.value}
-                />
-              ))}
-            </Picker>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowPicker(false)}
-            >
-              <Text style={styles.modalButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -241,61 +261,120 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f2f2f7',
   },
-  loadingContainer: {
-    flex: 1,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f2f2f7',
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#c6c6c8',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  composeButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
+  conversationCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  conversationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  defaultAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f0f8ff',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#34C759',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  messagesList: {
-    padding: 16,
-    paddingBottom: 8,
+  conversationDetails: {
+    flex: 1,
   },
-  messageContainer: {
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 12,
-    maxWidth: '85%',
-  },
-  currentUserMessage: {
-    backgroundColor: '#007AFF',
-    alignSelf: 'flex-end',
-  },
-  otherUserMessage: {
-    backgroundColor: '#fff',
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  messageHeader: {
+  conversationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  senderEmail: {
+  recipientName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  lastMessageTime: {
+    fontSize: 13,
+    color: '#8e8e93',
+  },
+  conversationFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lastMessage: {
+    flex: 1,
+    fontSize: 15,
+    color: '#8e8e93',
+    marginRight: 8,
+  },
+  unreadBadge: {
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  unreadCount: {
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 20,
-    marginBottom: 4,
-    color: '#333',
-  },
-  recipientText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
   },
   emptyState: {
     flex: 1,
@@ -305,103 +384,37 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#666',
+    color: '#8e8e93',
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#c7c7cc',
     textAlign: 'center',
+    marginBottom: 24,
   },
-  inputContainer: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    padding: 16,
-  },
-  recipientButton: {
+  newMessageButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  recipientButtonText: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '500',
-  },
-  recipientArrow: {
-    fontSize: 12,
-    color: '#666',
-  },
-  messageInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  messageInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 12,
-    fontSize: 16,
-    maxHeight: 100,
-  },
-  sendButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 8,
   },
-  sendButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  sendButtonText: {
+  newMessageButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    marginLeft: 8,
   },
-  modalOverlay: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '80%',
-    maxWidth: 300,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  picker: {
-    height: 120,
-  },
-  modalButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  modalButtonText: {
-    color: '#fff',
+  loadingText: {
+    marginTop: 12,
     fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    color: '#8e8e93',
   },
 });
