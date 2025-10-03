@@ -1,20 +1,43 @@
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { AuthService } from './src/services/auth';
+import { NotificationService } from './src/services/notifications';
+import AuthScreen from './src/screens/AuthScreen';
+import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Set up notification handlers
+    NotificationService.setupNotificationHandlers();
+
+    // Check authentication state
+    const unsubscribe = AuthService.onAuthStateChanged((user) => {
+      setIsAuthenticated(!!user);
+      setIsLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  if (isLoading) {
+    return null; // You can add a loading screen here
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <>
+      <StatusBar style="light" />
+      {isAuthenticated ? (
+        <AppNavigator />
+      ) : (
+        <AuthScreen onAuthSuccess={handleAuthSuccess} />
+      )}
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
