@@ -65,6 +65,7 @@ export interface Leader {
   'Campus Director': string[];
   ProfilePic?: string | Array<{url: string}>;
   UID?: string; // Firebase UID
+  nonCheStudentWaiverLink?: string; // Formula field for waiver link
 }
 
 // General User Types (for Users table)
@@ -86,6 +87,7 @@ export type AnyUser = Leader | AppUser;
 
 // Navigation Types
 export type RootTabParamList = {
+  Home: undefined;
   Updates: undefined;
   Info: undefined;
   Messages: undefined;
@@ -102,3 +104,14 @@ export interface AuthUser {
 
 // Message Recipient Groups
 export type RecipientGroup = 'Coordinator' | 'Director' | 'Tech';
+
+// Student Types (for Liability Waivers)
+export interface Student {
+  id: string;
+  Name: string;
+  Date: string;
+  Waiver?: Array<{url: string; filename: string}>;
+  'Parent Name'?: string | string[]; // Lookup field can be array
+  'Parent Email'?: string | string[]; // Lookup field can be array
+  recordid?: string;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { MessageService } from '../services/messageService';
 import { AuthService } from '../services/auth';
 import { AnyUser, Message } from '../types';
 import ProfileImage from '../components/ProfileImage';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 
 interface ConversationScreenProps {
@@ -34,6 +36,8 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -199,10 +203,9 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
               }
               size={12}
               color={
-                item.status === 'sending' ? '#8e8e93' :
-                item.status === 'sent' ? '#8e8e93' :
-                item.status === 'delivered' ? '#8e8e93' :
-                '#007AFF'
+                item.status === 'sending' || item.status === 'sent' || item.status === 'delivered'
+                  ? colors.textSecondary
+                  : colors.primary
               }
               style={styles.statusIcon}
             />
@@ -215,7 +218,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity style={styles.backButton} onPress={onBack}>
-        <Ionicons name="chevron-back" size={24} color="#007AFF" />
+        <Ionicons name="chevron-back" size={24} color={colors.primary} />
       </TouchableOpacity>
       
       <View style={styles.recipientInfo}>
@@ -231,7 +234,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       </View>
       
       <TouchableOpacity style={styles.moreButton}>
-        <Ionicons name="ellipsis-horizontal" size={24} color="#007AFF" />
+        <Ionicons name="ellipsis-horizontal" size={24} color={colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -241,7 +244,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       <View style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading conversation...</Text>
         </View>
       </View>
@@ -270,7 +273,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#c7c7cc" />
+              <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
               <Text style={styles.emptyText}>No messages yet</Text>
               <Text style={styles.emptySubtext}>Start a conversation!</Text>
             </View>
@@ -280,7 +283,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
             <TouchableOpacity style={styles.attachButton}>
-              <Ionicons name="add" size={24} color="#007AFF" />
+              <Ionicons name="add" size={24} color={colors.primary} />
             </TouchableOpacity>
 
             <TextInput
@@ -288,7 +291,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
               value={newMessage}
               onChangeText={setNewMessage}
               placeholder="Type a message..."
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor={colors.textSecondary}
               multiline
               maxLength={1000}
               returnKeyType="send"
@@ -314,9 +317,9 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
               disabled={!newMessage.trim() || isSending}
             >
               {isSending ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.primaryText} />
               ) : (
-                <Ionicons name="send" size={20} color="#fff" />
+                <Ionicons name="send" size={20} color={colors.primaryText} />
               )}
             </TouchableOpacity>
           </View>
@@ -326,13 +329,13 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
   },
   safeArea: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
   },
   keyboardAvoid: {
     flex: 1,
@@ -340,12 +343,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
     paddingTop: 10,
     paddingBottom: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: colors.separator,
   },
   backButton: {
     padding: 8,
@@ -381,11 +384,11 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   recipientStatus: {
     fontSize: 13,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
   moreButton: {
     padding: 8,
@@ -407,12 +410,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#8e8e93',
+    color: colors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#c7c7cc',
+    color: colors.textSecondary,
     marginTop: 8,
   },
   messageContainer: {
@@ -431,13 +434,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   sentBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.sentBubble,
     borderBottomRightRadius: 4,
   },
   receivedBubble: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.receivedBubble,
     borderBottomLeftRadius: 4,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -451,10 +454,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   sentText: {
-    color: '#fff',
+    color: colors.sentText,
   },
   receivedText: {
-    color: '#000',
+    color: colors.receivedText,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -463,33 +466,35 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: 12,
+    color: colors.textSecondary,
   },
   sentTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: colors.sentText,
+    opacity: 0.7,
   },
   receivedTime: {
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
   statusIcon: {
     marginLeft: 4,
   },
   inputContainer: {
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 8 : 8,
     borderTopWidth: 0.5,
-    borderTopColor: '#c6c6c8',
+    borderTopColor: colors.separator,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderColor: colors.separator,
   },
   attachButton: {
     padding: 8,
@@ -498,14 +503,14 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: colors.text,
     maxHeight: 100,
     minHeight: 36,
     paddingVertical: 8,
     paddingHorizontal: 4,
   },
   sendButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -514,7 +519,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#c7c7cc',
+    backgroundColor: colors.separator,
   },
   loadingContainer: {
     flex: 1,
@@ -524,6 +529,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
 });

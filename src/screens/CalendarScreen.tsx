@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface CalendarScreenProps {
   onBack: () => void;
@@ -19,6 +21,8 @@ interface CalendarScreenProps {
 export default function CalendarScreen({ onBack }: CalendarScreenProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [calendarError, setCalendarError] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Use the embed format with schedule view for better mobile display
   const calendarUrl = 'https://calendar.google.com/calendar/embed?src=Y18zZmNkZDNiMWIxMDdmMmYyOWJjNDA5YjhlYTdjZTBjOWJkZDRmNzUyNmUxOWI3MTgyMjdiMDZlOTE3ODEwNGU0QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20&ctz=America%2FDenver&mode=AGENDA';
@@ -55,11 +59,11 @@ export default function CalendarScreen({ onBack }: CalendarScreenProps) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Key Dates & Calendar</Text>
         <TouchableOpacity style={styles.browserButton} onPress={handleOpenInBrowser}>
-          <Ionicons name="open-outline" size={20} color="#007AFF" />
+          <Ionicons name="open-outline" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -67,13 +71,13 @@ export default function CalendarScreen({ onBack }: CalendarScreenProps) {
       <View style={styles.calendarContainer}>
         {calendarError ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="calendar-outline" size={64} color="#c7c7cc" />
+            <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
             <Text style={styles.errorTitle}>Calendar Unavailable</Text>
             <Text style={styles.errorMessage}>
               Unable to load the calendar in the app. The calendar may require authentication or the embed format may not be available. Tap the browser icon to open the full calendar experience.
             </Text>
             <TouchableOpacity style={styles.openButton} onPress={handleOpenInBrowser}>
-              <Ionicons name="open-outline" size={20} color="#fff" />
+              <Ionicons name="open-outline" size={20} color={colors.primaryText} />
               <Text style={styles.openButtonText}>Open in Browser</Text>
             </TouchableOpacity>
           </View>
@@ -81,7 +85,7 @@ export default function CalendarScreen({ onBack }: CalendarScreenProps) {
           <>
             {isLoading && (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007AFF" />
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Loading calendar...</Text>
               </View>
             )}
@@ -113,21 +117,21 @@ export default function CalendarScreen({ onBack }: CalendarScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
     paddingTop: 50,
     paddingBottom: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: colors.separator,
   },
   backButton: {
     padding: 8,
@@ -136,7 +140,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     textAlign: 'center',
   },
@@ -146,12 +150,12 @@ const styles = StyleSheet.create({
   },
   calendarContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     margin: 16,
     marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -162,7 +166,7 @@ const styles = StyleSheet.create({
   },
   webView: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
   },
   loadingContainer: {
     position: 'absolute',
@@ -172,31 +176,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     zIndex: 1,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
     marginTop: 16,
     marginBottom: 8,
   },
   errorMessage: {
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
@@ -204,13 +208,13 @@ const styles = StyleSheet.create({
   openButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
   openButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

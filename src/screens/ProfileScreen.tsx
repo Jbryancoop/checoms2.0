@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/auth';
-import { Leader, AppUser, AnyUser } from '../types';
+import { AnyUser } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface ProfileScreenProps {
   onLogout: () => void;
@@ -20,6 +23,8 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
   const [userInfo, setUserInfo] = useState<AnyUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { colors, isDarkMode, setTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     loadUserInfo();
@@ -69,10 +74,14 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
     );
   };
 
+  const handleThemeToggle = (value: boolean) => {
+    setTheme(value ? 'dark' : 'light');
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading profile...</Text>
       </View>
     );
@@ -81,7 +90,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
   if (!userInfo) {
     return (
       <View style={styles.errorContainer}>
-        <Ionicons name="person-circle-outline" size={64} color="#999" />
+        <Ionicons name="person-circle-outline" size={64} color={colors.textSecondary} />
         <Text style={styles.errorText}>Unable to load profile information</Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadUserInfo}>
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -103,7 +112,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
             />
           ) : (
             <View style={styles.defaultProfileImage}>
-              <Ionicons name="person" size={40} color="#007AFF" />
+              <Ionicons name="person" size={40} color={colors.primary} />
             </View>
           )}
         </View>
@@ -113,7 +122,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
       {/* Profile Information */}
       <View style={styles.infoSection}>
         <View style={styles.infoItem}>
-          <Ionicons name="mail" size={20} color="#007AFF" />
+          <Ionicons name="mail" size={20} color={colors.primary} />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Email</Text>
             <Text style={styles.infoValue}>
@@ -123,7 +132,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
         </View>
 
         <View style={styles.infoItem}>
-          <Ionicons name="call" size={20} color="#007AFF" />
+          <Ionicons name="call" size={20} color={colors.primary} />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Phone</Text>
             <Text style={styles.infoValue}>{userInfo.Phone}</Text>
@@ -131,7 +140,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
         </View>
 
         <View style={styles.infoItem}>
-          <Ionicons name="business" size={20} color="#007AFF" />
+          <Ionicons name="business" size={20} color={colors.primary} />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>
               {'Type of Campus' in userInfo ? 'Campus Type' : 'User Type'}
@@ -144,7 +153,7 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
 
         {'Campus Director' in userInfo && userInfo['Campus Director'] && userInfo['Campus Director'].length > 0 && (
           <View style={styles.infoItem}>
-            <Ionicons name="people" size={20} color="#007AFF" />
+            <Ionicons name="people" size={20} color={colors.primary} />
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Campus Director</Text>
               <Text style={styles.infoValue}>{userInfo['Campus Director'].join(', ')}</Text>
@@ -153,19 +162,36 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
         )}
       </View>
 
+      <View style={styles.settingsSection}>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <View style={styles.settingRow}>
+          <View style={styles.settingContent}>
+            <Text style={styles.settingLabel}>Dark Mode</Text>
+            <Text style={styles.settingDescription}>Switch between light and dark themes</Text>
+          </View>
+          <Switch
+            value={isDarkMode}
+            onValueChange={handleThemeToggle}
+            trackColor={{ false: colors.separator, true: colors.primary }}
+            thumbColor={isDarkMode ? colors.primaryText : '#f4f3f4'}
+            ios_backgroundColor={colors.separator}
+          />
+        </View>
+      </View>
+
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out" size={20} color="#fff" />
+        <Ionicons name="log-out" size={20} color={colors.primaryText} />
         <Text style={styles.logoutButtonText}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 20,
@@ -174,45 +200,45 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
     padding: 20,
   },
   errorText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   retryButton: {
     marginTop: 20,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
   },
   header: {
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     padding: 30,
     borderRadius: 12,
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -229,34 +255,34 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
   },
   defaultProfileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: colors.primary,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginBottom: 5,
   },
   role: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   infoSection: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -270,7 +296,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.separator,
   },
   infoContent: {
     marginLeft: 15,
@@ -278,26 +304,65 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
     fontWeight: '500',
+  },
+  settingsSection: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: colors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 10,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingContent: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.error,
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 12,
     marginTop: 10,
   },
   logoutButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

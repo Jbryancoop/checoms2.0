@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,16 @@ import { StaffUpdate } from '../types';
 import { AirtableService } from '../services/airtable';
 import PreloadService from '../services/preloadService';
 import UpdateDetailScreen from './UpdateDetailScreen';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 export default function UpdatesScreen() {
   const [updates, setUpdates] = useState<StaffUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedUpdate, setSelectedUpdate] = useState<StaffUpdate | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const loadUpdates = useCallback(async (useCache = true) => {
     try {
@@ -119,7 +123,7 @@ export default function UpdatesScreen() {
           </Text>
           <View style={styles.cardFooter}>
             <Text style={styles.readMoreText}>Tap to read more</Text>
-            <Ionicons name="chevron-forward" size={16} color="#007AFF" />
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
           </View>
         </View>
       </TouchableOpacity>
@@ -128,13 +132,13 @@ export default function UpdatesScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="newspaper-outline" size={64} color="#c7c7cc" />
+      <Ionicons name="newspaper-outline" size={64} color={colors.textSecondary} />
       <Text style={styles.emptyStateText}>No updates yet</Text>
       <Text style={styles.emptyStateSubtext}>
         Check back later for important announcements and updates
       </Text>
       <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-        <Ionicons name="refresh" size={16} color="#007AFF" />
+        <Ionicons name="refresh" size={16} color={colors.primary} />
         <Text style={styles.refreshButtonText}>Refresh</Text>
       </TouchableOpacity>
     </View>
@@ -197,7 +201,7 @@ export default function UpdatesScreen() {
         contentContainerStyle={styles.listContainer}
         style={styles.flatListStyle}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
@@ -206,16 +210,16 @@ export default function UpdatesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
   },
   flatListStyle: {
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     paddingTop: 50,
     paddingBottom: 15,
     paddingHorizontal: 16,
@@ -224,7 +228,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.primaryText,
   },
   loadingContainer: {
     flex: 1,
@@ -233,7 +237,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
   },
   listContainer: {
     paddingTop: 16,
@@ -241,10 +245,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   updateCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -253,7 +257,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderColor: colors.separator,
   },
   updateCardPressed: {
     transform: [{ scale: 0.98 }],
@@ -262,7 +266,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: 150,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
@@ -277,20 +281,20 @@ const styles = StyleSheet.create({
   },
   readMoreText: {
     fontSize: 15,
-    color: '#007AFF',
+    color: colors.primary,
     fontWeight: '400',
   },
   updateTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
     marginBottom: 6,
     lineHeight: 24,
     letterSpacing: -0.2,
   },
   updateDate: {
     fontSize: 14,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     marginBottom: 12,
     fontWeight: '500',
     textTransform: 'uppercase',
@@ -298,7 +302,7 @@ const styles = StyleSheet.create({
   },
   updateDescription: {
     fontSize: 16,
-    color: '#1c1c1e',
+    color: colors.text,
     lineHeight: 24,
     fontWeight: '400',
     letterSpacing: -0.1,
@@ -311,73 +315,73 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#666',
+    color: colors.text,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderColor: colors.separator,
   },
   refreshButtonText: {
-    color: '#007AFF',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
   },
   // Skeleton styles
   skeletonCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.surface,
   },
   skeletonImage: {
     width: '100%',
     height: 150,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
   skeletonTitle: {
     height: 20,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderRadius: 4,
     marginBottom: 8,
     width: '80%',
   },
   skeletonDate: {
     height: 14,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderRadius: 4,
     marginBottom: 12,
     width: '40%',
   },
   skeletonDescription: {
     height: 16,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderRadius: 4,
     marginBottom: 8,
     width: '100%',
   },
   skeletonReadMore: {
     height: 14,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderRadius: 4,
     width: 80,
   },
   skeletonChevron: {
     height: 14,
     width: 14,
-    backgroundColor: '#e9ecef',
+    backgroundColor: colors.separator,
     borderRadius: 2,
   },
 });

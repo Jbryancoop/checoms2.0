@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { AnyUser, Conversation } from '../types';
 import UserSelectionScreen from './UserSelectionScreen';
 import ConversationScreen from './ConversationScreen';
 import ProfileImage from '../components/ProfileImage';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 export default function MessagesScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -27,6 +29,8 @@ export default function MessagesScreen() {
   const [selectedRecipient, setSelectedRecipient] = useState<AnyUser | null>(null);
   const [currentUser, setCurrentUser] = useState<AnyUser | null>(null);
   const [conversationsUnsubscribe, setConversationsUnsubscribe] = useState<(() => void) | null>(null);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     const initializeData = async () => {
@@ -40,7 +44,6 @@ export default function MessagesScreen() {
       loadConversations();
     }
 
-    // Cleanup function
     return () => {
       if (conversationsUnsubscribe) {
         conversationsUnsubscribe();
@@ -77,19 +80,16 @@ export default function MessagesScreen() {
         return;
       }
 
-      // Clean up previous listener if exists
       if (conversationsUnsubscribe) {
         conversationsUnsubscribe();
       }
 
-      // Set up real-time listener for conversations
-      const unsubscribe = MessageService.getConversationsRealtime(currentUser.UID, (conversations) => {
-        console.log('📱 Real-time conversations update:', conversations);
-        setConversations(conversations);
+      const unsubscribe = MessageService.getConversationsRealtime(currentUser.UID, (data) => {
+        console.log('📱 Real-time conversations update:', data);
+        setConversations(data);
         setIsLoading(false);
       });
 
-      // Store unsubscribe function for cleanup
       setConversationsUnsubscribe(() => unsubscribe);
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -100,8 +100,6 @@ export default function MessagesScreen() {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
-    // The real-time listener will automatically update the conversations
-    // Just wait a moment for the refresh to complete
     setTimeout(() => {
       setIsRefreshing(false);
     }, 1000);
@@ -118,7 +116,6 @@ export default function MessagesScreen() {
 
   const handleBackFromConversation = () => {
     setSelectedRecipient(null);
-    // Refresh conversations when coming back
     loadConversations();
   };
 
@@ -127,10 +124,7 @@ export default function MessagesScreen() {
       'Delete Conversation',
       'Are you sure you want to delete this conversation?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -148,7 +142,7 @@ export default function MessagesScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -161,7 +155,7 @@ export default function MessagesScreen() {
       return 'now';
     } else if (diffInHours < 24) {
       return `${Math.floor(diffInHours)}h ago`;
-    } else if (diffInHours < 168) { // 7 days
+    } else if (diffInHours < 168) {
       return `${Math.floor(diffInHours / 24)}d ago`;
     } else {
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -169,10 +163,10 @@ export default function MessagesScreen() {
   };
 
   const SwipeableConversation = ({ item }: { item: Conversation }) => {
-    const translateX = React.useRef(new Animated.Value(0)).current;
+    const translateX = useRef(new Animated.Value(0)).current;
     const [showDelete, setShowDelete] = useState(false);
 
-    const panResponder = React.useRef(
+    const panResponder = useRef(
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => {
           return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 100;
@@ -185,14 +179,12 @@ export default function MessagesScreen() {
         },
         onPanResponderRelease: (_, gestureState) => {
           if (gestureState.dx < -100) {
-            // Swipe far enough to show delete
             Animated.spring(translateX, {
               toValue: -100,
               useNativeDriver: true,
             }).start();
             setShowDelete(true);
           } else {
-            // Snap back
             Animated.spring(translateX, {
               toValue: 0,
               useNativeDriver: true,
@@ -200,29 +192,20 @@ export default function MessagesScreen() {
             setShowDelete(false);
           }
         },
-      })
+      }),
     ).current;
 
     return (
       <View style={styles.swipeContainer}>
         {showDelete && (
           <View style={styles.rightActions}>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteConversation(item.id)}
-            >
-              <Ionicons name="trash" size={24} color="#fff" />
+            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteConversation(item.id)}>
+              <Ionicons name="trash" size={24} color={colors.primaryText} />
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         )}
-        <Animated.View
-          style={[
-            styles.conversationCard,
-            { transform: [{ translateX }] }
-          ]}
-          {...panResponder.panHandlers}
-        >
+        <Animated.View style={[styles.conversationCard, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
           <TouchableOpacity
             style={styles.conversationInfo}
             onPress={() => setSelectedRecipient(item.recipient)}
@@ -234,12 +217,10 @@ export default function MessagesScreen() {
               showOnlineIndicator={true}
               isOnline={item.isOnline}
             />
-            
+
             <View style={styles.conversationDetails}>
               <View style={styles.conversationHeader}>
-                <Text style={styles.recipientName}>
-                  {item.recipient['Full Name'] || 'Unknown User'}
-                </Text>
+                <Text style={styles.recipientName}>{item.recipient['Full Name'] || 'Unknown User'}</Text>
                 <Text style={styles.lastMessageTime}>{formatLastMessageTime(item.lastMessageTime)}</Text>
               </View>
               <View style={styles.conversationFooter}>
@@ -266,7 +247,7 @@ export default function MessagesScreen() {
       recipientName: item.recipient['Full Name'],
       hasProfilePic: !!item.recipient.ProfilePic,
       profilePicData: item.recipient.ProfilePic,
-      lastMessage: item.lastMessage
+      lastMessage: item.lastMessage,
     });
 
     return <SwipeableConversation item={item} />;
@@ -274,13 +255,13 @@ export default function MessagesScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="chatbubbles-outline" size={64} color="#c7c7cc" />
+      <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
       <Text style={styles.emptyStateText}>No conversations yet</Text>
       <Text style={styles.emptyStateSubtext}>
         Start a conversation by tapping the compose button
       </Text>
       <TouchableOpacity style={styles.newMessageButton} onPress={handleNewMessage}>
-        <Ionicons name="add" size={20} color="#fff" />
+        <Ionicons name="add" size={20} color={colors.primaryText} />
         <Text style={styles.newMessageButtonText}>New Message</Text>
       </TouchableOpacity>
     </View>
@@ -290,7 +271,7 @@ export default function MessagesScreen() {
     <View style={styles.header}>
       <Text style={styles.headerTitle}>Messages</Text>
       <TouchableOpacity style={styles.composeButton} onPress={handleNewMessage}>
-        <Ionicons name="create-outline" size={24} color="#007AFF" />
+        <Ionicons name="create-outline" size={24} color={colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -305,12 +286,7 @@ export default function MessagesScreen() {
   }
 
   if (selectedRecipient) {
-    return (
-      <ConversationScreen
-        recipient={selectedRecipient}
-        onBack={handleBackFromConversation}
-      />
-    );
+    return <ConversationScreen recipient={selectedRecipient} onBack={handleBackFromConversation} />;
   }
 
   if (isLoading) {
@@ -318,7 +294,7 @@ export default function MessagesScreen() {
       <View style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading conversations...</Text>
         </View>
       </View>
@@ -328,15 +304,13 @@ export default function MessagesScreen() {
   return (
     <View style={styles.container}>
       {renderHeader()}
-      
+
       <FlatList
         data={conversations}
         renderItem={renderConversation}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -344,26 +318,26 @@ export default function MessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
     paddingTop: 50,
     paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: colors.separator,
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   composeButton: {
     padding: 8,
@@ -375,11 +349,11 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   conversationCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -391,34 +365,6 @@ const styles = StyleSheet.create({
   conversationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  defaultAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f8ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#34C759',
-    borderWidth: 2,
-    borderColor: '#fff',
   },
   conversationDetails: {
     flex: 1,
@@ -432,11 +378,11 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   lastMessageTime: {
     fontSize: 13,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
   conversationFooter: {
     flexDirection: 'row',
@@ -446,11 +392,11 @@ const styles = StyleSheet.create({
   lastMessage: {
     flex: 1,
     fontSize: 15,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     marginRight: 8,
   },
   unreadBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -459,7 +405,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   unreadCount: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -471,25 +417,25 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
-    color: '#8e8e93',
+    color: colors.text,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#c7c7cc',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },
   newMessageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
   },
   newMessageButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
@@ -502,9 +448,8 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
-  // Swipe to delete styles
   swipeContainer: {
     position: 'relative',
     overflow: 'hidden',
@@ -519,9 +464,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingRight: 16,
     zIndex: 1,
+    backgroundColor: colors.background,
   },
   deleteButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
@@ -530,7 +476,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   deleteButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,

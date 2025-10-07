@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AirtableService } from '../services/airtable';
-import { Leader, AppUser, AnyUser } from '../types';
+import { AnyUser } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface UserSelectionScreenProps {
   onBack: () => void;
@@ -25,21 +27,22 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
       console.log('🔄 Loading all users for messaging...');
-      
-      // Get both staff and users
+
       const [staff, users] = await Promise.all([
         AirtableService.getAllStaff(),
         AirtableService.getAllUsers(),
       ]);
-      
+
       const combinedUsers = [...staff, ...users];
       console.log('📱 Loaded users:', combinedUsers.length);
-      
+
       setAllUsers(combinedUsers);
       setFilteredUsers(combinedUsers);
     } catch (error) {
@@ -56,7 +59,7 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    
+
     if (!query.trim()) {
       setFilteredUsers(allUsers);
       return;
@@ -68,38 +71,39 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
       const lastName = user['Last Name']?.toLowerCase() || '';
       const email = ('CHE Email' in user ? user['CHE Email'] : user['Email'])?.toLowerCase() || '';
       const userType = ('Type of Campus' in user ? user['Type of Campus'] : user['User Type'])?.toLowerCase() || '';
-      
+
       const searchTerm = query.toLowerCase();
-      
-      return fullName.includes(searchTerm) ||
-             firstName.includes(searchTerm) ||
-             lastName.includes(searchTerm) ||
-             email.includes(searchTerm) ||
-             userType.includes(searchTerm);
+
+      return (
+        fullName.includes(searchTerm) ||
+        firstName.includes(searchTerm) ||
+        lastName.includes(searchTerm) ||
+        email.includes(searchTerm) ||
+        userType.includes(searchTerm)
+      );
     });
 
     setFilteredUsers(filtered);
   };
 
-  const handleUserSelect = (user: AnyUser) => {
+  const handleUserSelectInternal = (user: AnyUser) => {
+    const newSelection = new Set(selectedUsers);
+    if (newSelection.has(user.id)) {
+      newSelection.delete(user.id);
+    } else {
+      newSelection.add(user.id);
+    }
+    setSelectedUsers(newSelection);
     onUserSelect(user);
   };
 
-  const getUserDisplayName = (user: AnyUser) => {
-    return user['Full Name'] || 'Unknown User';
-  };
+  const getUserDisplayName = (user: AnyUser) => user['Full Name'] || 'Unknown User';
 
-  const getUserEmail = (user: AnyUser) => {
-    return 'CHE Email' in user ? user['CHE Email'] : user['Email'];
-  };
+  const getUserEmail = (user: AnyUser) => ('CHE Email' in user ? user['CHE Email'] : user['Email']) || '';
 
-  const getUserType = (user: AnyUser) => {
-    return 'Type of Campus' in user ? user['Type of Campus'] : user['User Type'];
-  };
+  const getUserType = (user: AnyUser) => ('Type of Campus' in user ? user['Type of Campus'] : user['User Type']) || '';
 
-  const getUserProfilePic = (user: AnyUser) => {
-    return user.ProfilePic;
-  };
+  const getUserProfilePic = (user: AnyUser) => user.ProfilePic;
 
   const renderUser = ({ item }: { item: AnyUser }) => {
     const displayName = getUserDisplayName(item);
@@ -111,24 +115,24 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
     return (
       <TouchableOpacity
         style={[styles.userCard, isSelected && styles.selectedUserCard]}
-        onPress={() => handleUserSelect(item)}
+        onPress={() => handleUserSelectInternal(item)}
         activeOpacity={0.7}
       >
         <View style={styles.userInfo}>
           <View style={styles.profileImageContainer}>
             {profilePic ? (
-              <Image 
-                source={{ uri: Array.isArray(profilePic) ? profilePic[0]?.url : profilePic }} 
+              <Image
+                source={{ uri: Array.isArray(profilePic) ? profilePic[0]?.url : profilePic }}
                 style={styles.profileImage}
                 onError={() => console.log('Failed to load profile image')}
               />
             ) : (
               <View style={styles.defaultProfileImage}>
-                <Ionicons name="person" size={24} color="#007AFF" />
+                <Ionicons name="person" size={24} color={colors.primary} />
               </View>
             )}
           </View>
-          
+
           <View style={styles.userDetails}>
             <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.userEmail}>{email}</Text>
@@ -137,12 +141,12 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
             </View>
           </View>
         </View>
-        
+
         <View style={styles.userActions}>
-          <Ionicons 
-            name={isSelected ? "checkmark-circle" : "chevron-forward"} 
-            size={24} 
-            color={isSelected ? "#007AFF" : "#8e8e93"} 
+          <Ionicons
+            name={isSelected ? 'checkmark-circle' : 'chevron-forward'}
+            size={24}
+            color={isSelected ? colors.primary : colors.textSecondary}
           />
         </View>
       </TouchableOpacity>
@@ -151,7 +155,7 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="people-outline" size={64} color="#c7c7cc" />
+      <Ionicons name="people-outline" size={64} color={colors.textSecondary} />
       <Text style={styles.emptyStateText}>
         {searchQuery ? 'No users found matching your search' : 'No users available'}
       </Text>
@@ -168,14 +172,14 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Ionicons name="chevron-back" size={24} color="#007AFF" />
+            <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Select User</Text>
           <View style={styles.placeholder} />
         </View>
-        
+
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading users...</Text>
         </View>
       </View>
@@ -184,44 +188,38 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Select User</Text>
         <View style={styles.placeholder} />
       </View>
 
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color="#8e8e93" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search users..."
+            placeholder="Search by name, email, or campus..."
             value={searchQuery}
             onChangeText={handleSearch}
-            placeholderTextColor="#8e8e93"
+            placeholderTextColor={colors.textSecondary}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearSearchButton}
-              onPress={() => handleSearch('')}
-            >
-              <Ionicons name="close-circle" size={20} color="#8e8e93" />
+            <TouchableOpacity style={styles.clearSearchButton} onPress={() => handleSearch('')}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
-      {/* Users List */}
       <FlatList
         data={filteredUsers}
         renderItem={renderUser}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        style={styles.flatListStyle}
+        style={styles.flatList}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -229,21 +227,21 @@ export default function UserSelectionScreen({ onBack, onUserSelect }: UserSelect
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
     paddingTop: 50,
     paddingBottom: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: colors.separator,
   },
   backButton: {
     padding: 8,
@@ -252,24 +250,24 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   placeholder: {
     width: 40,
   },
   searchContainer: {
     padding: 16,
-    backgroundColor: '#f2f2f7',
+    backgroundColor: colors.background,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#e5e5ea',
+    borderColor: colors.separator,
   },
   searchIcon: {
     marginRight: 12,
@@ -277,26 +275,26 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: colors.text,
   },
   clearSearchButton: {
     marginLeft: 8,
   },
-  flatListStyle: {
-    backgroundColor: '#f2f2f7',
+  flatList: {
+    backgroundColor: colors.background,
   },
   listContainer: {
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
   userCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -304,60 +302,61 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    borderWidth: 1,
+    borderColor: colors.separator,
   },
   selectedUserCard: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    backgroundColor: '#f0f8ff',
+    borderColor: colors.primary,
   },
   userInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   profileImageContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     overflow: 'hidden',
     marginRight: 12,
+    backgroundColor: colors.surface,
   },
   profileImage: {
     width: '100%',
     height: '100%',
   },
   defaultProfileImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f8ff',
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.surface,
   },
   userDetails: {
     flex: 1,
   },
   userName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
     marginBottom: 2,
   },
   userEmail: {
     fontSize: 14,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   userTypeContainer: {
     alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   userType: {
     fontSize: 12,
-    color: '#007AFF',
-    backgroundColor: '#f0f8ff',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    fontWeight: '500',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   userActions: {
     marginLeft: 12,
@@ -370,18 +369,19 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginTop: 16,
   },
   clearButton: {
-    backgroundColor: '#f2f2f7',
+    marginTop: 16,
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   clearButtonText: {
-    color: '#007AFF',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -393,6 +393,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#8e8e93',
+    color: colors.textSecondary,
   },
 });

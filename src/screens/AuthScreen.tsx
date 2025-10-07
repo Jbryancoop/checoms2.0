@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { AuthService } from '../services/auth';
 import { auth } from '../services/firebase';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 
 interface AuthScreenProps {
@@ -18,6 +20,8 @@ interface AuthScreenProps {
 
 export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // Configure Google Sign-In on component mount
   useEffect(() => {
@@ -67,7 +71,7 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.primaryText} />
           ) : (
             <>
               <Image
@@ -87,10 +91,10 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -106,13 +110,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginBottom: 10,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 40,
     textAlign: 'center',
     lineHeight: 22,
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
   signInButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4285f4',
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -129,7 +133,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   signInButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.separator,
   },
   googleLogo: {
     width: 20,
@@ -137,13 +141,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   signInButtonText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '500',
   },
   disclaimer: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 16,
     maxWidth: 280,

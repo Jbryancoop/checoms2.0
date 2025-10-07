@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StaffUpdate } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface UpdateDetailScreenProps {
   update: StaffUpdate;
@@ -18,6 +20,9 @@ interface UpdateDetailScreenProps {
 }
 
 export default function UpdateDetailScreen({ update, onBack }: UpdateDetailScreenProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const handleLinkPress = async (url: string) => {
     try {
       const supported = await Linking.canOpenURL(url);
@@ -55,7 +60,7 @@ export default function UpdateDetailScreen({ update, onBack }: UpdateDetailScree
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Update</Text>
         <View style={styles.placeholder} />
@@ -87,7 +92,7 @@ export default function UpdateDetailScreen({ update, onBack }: UpdateDetailScree
               style={styles.linkButton}
               onPress={() => handleLinkPress(update.Link!)}
             >
-              <Ionicons name="link" size={20} color="#fff" />
+              <Ionicons name="link" size={20} color={colors.primaryText} />
               <Text style={styles.linkText}>Open Link</Text>
             </TouchableOpacity>
           )}
@@ -97,21 +102,21 @@ export default function UpdateDetailScreen({ update, onBack }: UpdateDetailScree
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#e5e5ea',
+    backgroundColor: colors.background,
     paddingTop: 50,
     paddingBottom: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#c6c6c8',
+    borderBottomColor: colors.separator,
   },
   backButton: {
     padding: 8,
@@ -120,7 +125,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   placeholder: {
     width: 40,
@@ -131,18 +136,18 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     height: 200,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: colors.surface,
   },
   image: {
     width: '100%',
     height: '100%',
   },
   contentCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     margin: 16,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 1,
@@ -154,14 +159,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     marginBottom: 12,
     lineHeight: 32,
     letterSpacing: -0.3,
   },
   date: {
     fontSize: 14,
-    color: '#8e8e93',
+    color: colors.textSecondary,
     marginBottom: 24,
     fontWeight: '500',
     textTransform: 'uppercase',
@@ -172,7 +177,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 17,
-    color: '#1c1c1e',
+    color: colors.text,
     lineHeight: 26,
     fontWeight: '400',
     letterSpacing: -0.1,
@@ -181,11 +186,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 10,
-    shadowColor: '#007AFF',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -195,7 +200,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   linkText: {
-    color: '#fff',
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

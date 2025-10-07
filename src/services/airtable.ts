@@ -1,5 +1,5 @@
 import Airtable from 'airtable';
-import { StaffInfo, StaffUpdate, StaffMessage, Leader, AppUser, AnyUser } from '../types';
+import { StaffInfo, StaffUpdate, StaffMessage, Leader, AppUser, AnyUser, Student } from '../types';
 
 // Initialize Airtable
 console.log('🔧 Airtable API Key:', process.env.EXPO_PUBLIC_AIRTABLE_API_KEY ? 'Present' : 'Missing');
@@ -9,6 +9,11 @@ const base = new Airtable({
   apiKey: process.env.EXPO_PUBLIC_AIRTABLE_API_KEY || '',
 }).base(process.env.EXPO_PUBLIC_AIRTABLE_BASE_ID || '');
 
+// Separate base for waivers/students
+const waiversBase = new Airtable({
+  apiKey: process.env.EXPO_PUBLIC_AIRTABLE_API_KEY || '',
+}).base('appfBNaAU1viR5UIq');
+
 // Table IDs from your CSV
 const TABLES = {
   STAFF_INFO: 'tblO65y2oxVPbROoU',
@@ -16,6 +21,7 @@ const TABLES = {
   STAFF_UPDATES: 'tblJqbelzK03BNOwZ',
   STAFF_MESSAGES: 'tbl0VWPjWbDv1Cv4O',
   LEADERS: 'tblltaeQ2muGLvXcb',
+  STUDENTS: 'tblYQ8TAjQCvLbctg', // Students table for liability waivers
 };
 
 // Field IDs from your CSV
@@ -52,6 +58,7 @@ const FIELDS = {
     CAMPUS_DIRECTOR: 'fldKWWsuRkTLul0dG',
     PROFILE_PIC: 'fldn3PTlfulF0zgKs',
     UID: 'fldUID', // TODO: Replace with actual UID field ID from Airtable
+    NON_CHE_STUDENT_WAIVER_LINK: 'fldAE8HILE6qYQi93', // Formula field - waiver link
   },
   USERS: {
     FULL_NAME: 'fld49XrNRSBQNAmTF',
@@ -64,6 +71,14 @@ const FIELDS = {
     PROFILE_PIC: 'fldqCv9V2GsOXsYso',
     ACTIVE: 'fldn7dYSupCY345Ew',
   },
+  STUDENTS: {
+    NAME: 'fldkJBQaVh3OsT36b',
+    DATE: 'fldUZFhJtojhhkK1H',
+    WAIVER: 'fld6PEAztSzXvfaHZ', // Waiver (from Waiver) - Attachment
+    PARENT_NAME: 'fldcsY5BnRxmF3oHm',
+    PARENT_EMAIL: 'fldRF9Vg1IXj1OfOr',
+    RECORD_ID: 'fldGiFnis6MzwqVrd',
+  },
 };
 
 export class AirtableService {
@@ -73,11 +88,12 @@ export class AirtableService {
       console.log('🔍 Searching for staff with email:', email);
       console.log('🔍 Using Airtable base ID:', process.env.EXPO_PUBLIC_AIRTABLE_BASE_ID);
       console.log('🔍 Using Airtable API key:', process.env.EXPO_PUBLIC_AIRTABLE_API_KEY ? 'Present' : 'Missing');
-      
+
       const records = await base(TABLES.LEADERS)
         .select({
           filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
+          // Don't specify fields - let Airtable return all fields including formula fields
         })
         .firstPage();
 
@@ -110,8 +126,16 @@ export class AirtableService {
       
       // Debug: Let's see what fields are actually available
       console.log('🔍 Available fields in record:', Object.keys(record.fields));
-      console.log('🔍 All field values:', record.fields);
-      
+      console.log('🔍 All field values:', JSON.stringify(record.fields, null, 2));
+      console.log('🔍 Trying to get nonCheStudentWaiverLink by name:', record.get('nonCheStudentWaiverLink'));
+      console.log('🔍 Trying to get nonCheStudentWaiverLink by field ID:', record.get(FIELDS.LEADERS.NON_CHE_STUDENT_WAIVER_LINK));
+
+      const waiverLink = record.get('nonCheStudentWaiverLink') as string ||
+                        record.get(FIELDS.LEADERS.NON_CHE_STUDENT_WAIVER_LINK) as string ||
+                        record.fields['nonCheStudentWaiverLink'] as string;
+
+      console.log('🔍 Final waiver link value:', waiverLink);
+
       return {
         id: record.id,
         'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
@@ -125,6 +149,7 @@ export class AirtableService {
         'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
         ProfilePic: record.get('ProfilePic') as string,
         UID: record.get('UID') as string || '', // This field doesn't exist yet
+        nonCheStudentWaiverLink: waiverLink,
       };
     } catch (error) {
       console.error('Error fetching staff by email:', error);
@@ -136,11 +161,12 @@ export class AirtableService {
   static async updateStaffUID(email: string, uid: string): Promise<void> {
     try {
       console.log('🔄 Updating UID for email:', email, 'with UID:', uid);
-      
+
       const records = await base(TABLES.LEADERS)
         .select({
           filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
+          fields: ['CHE Email', 'UID'], // Only need these fields for update
         })
         .firstPage();
 
@@ -184,6 +210,7 @@ export class AirtableService {
         .select({
           filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
+          fields: ['CHE Email', 'Push Token'], // Only need these fields for update
         })
         .firstPage();
 
@@ -410,29 +437,37 @@ export class AirtableService {
   static async getAllStaff(): Promise<Leader[]> {
     try {
       console.log('🔍 Fetching all staff for directory...');
-      
+
       const records = await base(TABLES.LEADERS)
         .select({
           sort: [{ field: 'Full Name', direction: 'asc' }],
+          // Don't specify fields - let Airtable return all fields including formula fields
         })
         .all();
 
       console.log('🔍 Found staff records:', records.length);
 
-      const staff = records.map(record => ({
-        id: record.id,
-        'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
-        'Full Name': record.get('Full Name') as string,
-        'First Name': record.get('First Name') as string,
-        'Last Name': record.get('Last Name') as string,
-        'Google ID': record.get('Google ID') as string || '',
-        Phone: record.get('Phone') as string,
-        'Type of Campus': record.get('Type of Campus') as any,
-        'CHE Email': record.get('CHE Email') as string,
-        'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
-        ProfilePic: record.get('ProfilePic') as string,
-        UID: record.get('UID') as string || '',
-      }));
+      const staff = records.map(record => {
+        const waiverLink = record.get('nonCheStudentWaiverLink') as string ||
+                          record.get(FIELDS.LEADERS.NON_CHE_STUDENT_WAIVER_LINK) as string ||
+                          record.fields['nonCheStudentWaiverLink'] as string;
+
+        return {
+          id: record.id,
+          'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
+          'Full Name': record.get('Full Name') as string,
+          'First Name': record.get('First Name') as string,
+          'Last Name': record.get('Last Name') as string,
+          'Google ID': record.get('Google ID') as string || '',
+          Phone: record.get('Phone') as string,
+          'Type of Campus': record.get('Type of Campus') as any,
+          'CHE Email': record.get('CHE Email') as string,
+          'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
+          ProfilePic: record.get('ProfilePic') as string,
+          UID: record.get('UID') as string || '',
+          nonCheStudentWaiverLink: waiverLink,
+        };
+      });
 
       console.log('✅ Returning staff directory:', staff.length, 'members');
       return staff;
@@ -533,11 +568,16 @@ export class AirtableService {
           .select({
             filterByFormula: `{UID} = '${userId}'`,
             maxRecords: 1,
+            // Don't specify fields - let Airtable return all fields including formula fields
           })
           .firstPage();
 
         if (leaderRecords.length > 0) {
           const record = leaderRecords[0];
+          const waiverLink = record.get('nonCheStudentWaiverLink') as string ||
+                            record.get(FIELDS.LEADERS.NON_CHE_STUDENT_WAIVER_LINK) as string ||
+                            record.fields['nonCheStudentWaiverLink'] as string;
+
           const leader: Leader = {
             id: record.id,
             'Micro-Campus Leader': record.get('Micro-Campus Leader') as string,
@@ -551,6 +591,7 @@ export class AirtableService {
             'Campus Director': record.get('Campus Director (from Micro-Campus Data)') as string[],
             ProfilePic: record.get('ProfilePic') as string | Array<{url: string}>,
             UID: record.get('UID') as string || '',
+            nonCheStudentWaiverLink: waiverLink,
           };
           console.log('✅ Found user in Leaders table:', leader);
           return leader;
@@ -672,24 +713,77 @@ export class AirtableService {
       const records = await base(TABLES.LEADERS)
         .select({
           filterByFormula: `FIND('${role}', {Type of Campus}) > 0`,
+          // Don't specify fields - let Airtable return all fields including formula fields
         })
         .firstPage();
 
-      return records.map(record => ({
-        id: record.id,
-        'Micro-Campus Leader': record.get(FIELDS.LEADERS.MICRO_CAMPUS_LEADER) as string,
-        'Full Name': record.get(FIELDS.LEADERS.FULL_NAME) as string,
-        'First Name': record.get(FIELDS.LEADERS.FIRST_NAME) as string,
-        'Last Name': record.get(FIELDS.LEADERS.LAST_NAME) as string,
-        'Google ID': record.get(FIELDS.LEADERS.GOOGLE_ID) as string,
-        Phone: record.get(FIELDS.LEADERS.PHONE) as string,
-        'Type of Campus': record.get(FIELDS.LEADERS.TYPE_OF_CAMPUS) as any,
-        'CHE Email': record.get(FIELDS.LEADERS.CHE_EMAIL) as string,
-        'Campus Director': record.get(FIELDS.LEADERS.CAMPUS_DIRECTOR) as string[],
-        ProfilePic: record.get(FIELDS.LEADERS.PROFILE_PIC) as string,
-      }));
+      return records.map(record => {
+        const waiverLink = record.get('nonCheStudentWaiverLink') as string ||
+                          record.get(FIELDS.LEADERS.NON_CHE_STUDENT_WAIVER_LINK) as string ||
+                          record.fields['nonCheStudentWaiverLink'] as string;
+
+        return {
+          id: record.id,
+          'Micro-Campus Leader': record.get(FIELDS.LEADERS.MICRO_CAMPUS_LEADER) as string,
+          'Full Name': record.get(FIELDS.LEADERS.FULL_NAME) as string,
+          'First Name': record.get(FIELDS.LEADERS.FIRST_NAME) as string,
+          'Last Name': record.get(FIELDS.LEADERS.LAST_NAME) as string,
+          'Google ID': record.get(FIELDS.LEADERS.GOOGLE_ID) as string,
+          Phone: record.get(FIELDS.LEADERS.PHONE) as string,
+          'Type of Campus': record.get(FIELDS.LEADERS.TYPE_OF_CAMPUS) as any,
+          'CHE Email': record.get(FIELDS.LEADERS.CHE_EMAIL) as string,
+          'Campus Director': record.get(FIELDS.LEADERS.CAMPUS_DIRECTOR) as string[],
+          ProfilePic: record.get(FIELDS.LEADERS.PROFILE_PIC) as string,
+          nonCheStudentWaiverLink: waiverLink,
+        };
+      });
     } catch (error) {
       console.error('Error fetching staff by role:', error);
+      throw error;
+    }
+  }
+
+  // Get all students with liability waivers (from separate waivers base)
+  static async getAllStudents(): Promise<Student[]> {
+    try {
+      console.log('🔍 Fetching all students with waivers from base appfBNaAU1viR5UIq...');
+      console.log('🔍 Using Students table ID:', TABLES.STUDENTS);
+
+      const records = await waiversBase(TABLES.STUDENTS)
+        .select({
+          sort: [{ field: 'Name', direction: 'asc' }],
+        })
+        .all();
+
+      console.log('🔍 Found student records:', records.length);
+
+      // Debug: Log first record to see available fields
+      if (records.length > 0) {
+        console.log('🔍 Sample record fields:', Object.keys(records[0].fields));
+        console.log('🔍 Sample record data:', records[0].fields);
+      }
+
+      const students = records.map(record => ({
+        id: record.id,
+        Name: record.get('Name') as string,
+        Date: record.get('Date') as string,
+        Waiver: record.get('Waiver (from Waiver)') as Array<{url: string; filename: string}>,
+        'Parent Name': record.get('Parent Name') as string | string[], // Lookup field returns array
+        'Parent Email': record.get('Parent Email') as string | string[], // Lookup field returns array
+        recordid: record.get('recordid') as string,
+      }));
+
+      console.log('✅ Returning students:', students.length, 'students');
+      return students;
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      if (error.message) {
+        console.error('Error message:', error.message);
+      }
+      if (error.statusCode) {
+        console.error('Error status code:', error.statusCode);
+      }
       throw error;
     }
   }

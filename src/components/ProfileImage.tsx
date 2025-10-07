@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ImageOptimizer } from '../utils/imageOptimizer';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface ProfileImageProps {
   profilePic: any;
@@ -19,6 +21,8 @@ export default function ProfileImage({
   isOnline = false,
 }: ProfileImageProps) {
   const imageUrl = ImageOptimizer.getOptimizedAirtableUrl(profilePic, 'small');
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={[styles.container, style]}>
@@ -30,26 +34,35 @@ export default function ProfileImage({
         />
       ) : (
         <View style={[styles.defaultImage, { width: size, height: size, borderRadius: size / 2 }]}>
-          <Ionicons name="person" size={size * 0.4} color="#007AFF" />
+          <Ionicons name="person" size={size * 0.4} color={colors.primary} />
         </View>
       )}
 
       {showOnlineIndicator && isOnline && (
-        <View style={[styles.onlineIndicator, { width: size * 0.24, height: size * 0.24, borderRadius: size * 0.12 }]} />
+        <View
+          style={[
+            styles.onlineIndicator,
+            {
+              width: size * 0.24,
+              height: size * 0.24,
+              borderRadius: size * 0.12,
+            },
+          ]}
+        />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     position: 'relative',
   },
   image: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: colors.surface,
   },
   defaultImage: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -57,8 +70,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 2,
     right: 2,
-    backgroundColor: '#34C759',
+    backgroundColor: colors.success,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: colors.background,
   },
 });

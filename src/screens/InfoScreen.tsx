@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DirectoryScreen from './DirectoryScreen';
 import CalendarScreen from './CalendarScreen';
+import WaiversScreen from './WaiversScreen';
+import { useTheme } from '../contexts/ThemeContext';
+import { Colors as ThemeColors } from '../theme/colors';
 
 interface InfoCard {
   id: string;
@@ -18,7 +21,7 @@ interface InfoCard {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   action?: {
-    type: 'link' | 'email' | 'phone' | 'directory' | 'calendar';
+    type: 'link' | 'email' | 'phone' | 'directory' | 'calendar' | 'waivers';
     value: string;
     label: string;
   };
@@ -27,6 +30,9 @@ interface InfoCard {
 export default function InfoScreen() {
   const [showDirectory, setShowDirectory] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showWaivers, setShowWaivers] = useState(false);
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const infoCards: InfoCard[] = [
     {
@@ -60,6 +66,17 @@ export default function InfoScreen() {
         type: 'email',
         value: 'Help@che.school',
         label: 'Contact Tech Support',
+      },
+    },
+    {
+      id: '4',
+      title: 'Liability Waivers',
+      description: 'View and search student liability waivers on file.',
+      icon: 'document-text',
+      action: {
+        type: 'waivers',
+        value: 'waivers',
+        label: 'View Waivers',
       },
     },
     {
@@ -100,6 +117,9 @@ export default function InfoScreen() {
         case 'calendar':
           setShowCalendar(true);
           break;
+        case 'waivers':
+          setShowWaivers(true);
+          break;
       }
     } catch (error) {
       console.error('Error handling action:', error);
@@ -111,7 +131,7 @@ export default function InfoScreen() {
     <View key={card.id} style={styles.infoCard}>
       <View style={styles.cardHeader}>
         <View style={styles.iconContainer}>
-          <Ionicons name={card.icon} size={24} color="#007AFF" />
+          <Ionicons name={card.icon} size={24} color={colors.primary} />
         </View>
         <Text style={styles.cardTitle}>{card.title}</Text>
       </View>
@@ -124,7 +144,7 @@ export default function InfoScreen() {
           onPress={() => handleAction(card.action)}
         >
           <Text style={styles.actionButtonText}>{card.action.label}</Text>
-          <Ionicons name="arrow-forward" size={16} color="#007AFF" />
+          <Ionicons name="arrow-forward" size={16} color={colors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -136,6 +156,10 @@ export default function InfoScreen() {
 
   if (showCalendar) {
     return <CalendarScreen onBack={() => setShowCalendar(false)} />;
+  }
+
+  if (showWaivers) {
+    return <WaiversScreen onBack={() => setShowWaivers(false)} />;
   }
 
   return (
@@ -158,10 +182,10 @@ export default function InfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
   contentContainer: {
     padding: 16,
@@ -173,20 +197,20 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   infoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -204,7 +228,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f8ff',
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -212,12 +236,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.text,
     flex: 1,
   },
   cardDescription: {
     fontSize: 16,
-    color: '#555',
+    color: colors.text,
     lineHeight: 22,
     marginBottom: 16,
   },
@@ -225,29 +249,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: colors.separator,
   },
   actionButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.primary,
     fontWeight: '500',
   },
   footer: {
     marginTop: 24,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: colors.primary,
   },
   footerText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },
