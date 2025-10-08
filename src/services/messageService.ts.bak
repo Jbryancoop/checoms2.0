@@ -78,7 +78,7 @@ export class MessageService {
     userId2: string,
     callback: (messages: Message[]) => void
   ): () => void {
-    console.log('[MSG] 🔍 Setting up message listener for users:', userId1, userId2);
+    console.log('🔍 Setting up message listener for users:', userId1, userId2);
 
     // If userId2 doesn't have a UID, use the Airtable ID instead
     const recipientId = userId2.startsWith('rec') ? userId2 : userId2;
@@ -93,7 +93,7 @@ export class MessageService {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        console.log('[MSG] 📨 Firestore snapshot received:', snapshot.size, 'messages');
+        console.log('📨 Firestore snapshot received:', snapshot.size, 'messages');
         const messages: Message[] = [];
 
         snapshot.forEach((docSnap) => {
@@ -105,7 +105,7 @@ export class MessageService {
 
             // Skip messages that the current user has deleted
             if (data.deletedBy?.[userId1]) {
-              console.log('[MSG] ⏭️ Skipping deleted message for user', userId1, ':', docSnap.id);
+              console.log('⏭️ Skipping deleted message for user', userId1, ':', docSnap.id);
               return;
             }
 
@@ -125,13 +125,13 @@ export class MessageService {
           }
         });
 
-        console.log(`[MSG] 📨 Filtered to ${messages.length} messages (excluded deleted messages for user ${userId1})`);
+        console.log(`📨 Filtered to ${messages.length} messages (excluded deleted messages for user ${userId1})`);
         callback(messages);
       },
       (error: any) => {
         // Suppress permission errors when user is logged out
         if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
-          console.log('[MSG] ⚠️ Messages listener: User logged out, ignoring permission error');
+          console.log('⚠️ Messages listener: User logged out, ignoring permission error');
         } else {
           console.error('❌ Error listening to messages:', error);
           console.error('❌ Error details:', error);
@@ -148,7 +148,7 @@ export class MessageService {
   // Get conversations for a user
   static async getConversations(userId: string): Promise<Conversation[]> {
     try {
-      console.log('[MSG] 🔍 Getting conversations for user:', userId);
+      console.log('🔍 Getting conversations for user:', userId);
 
       const conversationsRef = collection(db, this.conversationsCollection);
       const q = query(
@@ -165,7 +165,7 @@ export class MessageService {
 
         // Skip if this user has deleted the conversation
         if (data.deletedBy?.[userId]) {
-          console.log('[MSG] ⏭️ Skipping deleted conversation:', docSnap.id);
+          console.log('⏭️ Skipping deleted conversation:', docSnap.id);
           continue;
         }
 
@@ -207,7 +207,7 @@ export class MessageService {
         }
       }
 
-      console.log('[MSG] ✅ Found conversations:', conversations.length);
+      console.log('✅ Found conversations:', conversations.length);
       return conversations;
     } catch (error) {
       console.error('❌ Error getting conversations:', error);
@@ -217,7 +217,7 @@ export class MessageService {
 
   // Get conversations with real-time updates
   static getConversationsRealtime(userId: string, callback: (conversations: Conversation[]) => void): () => void {
-    console.log('[MSG] 🔍 Setting up real-time conversations listener for user:', userId);
+    console.log('🔍 Setting up real-time conversations listener for user:', userId);
 
     const conversationsRef = collection(db, this.conversationsCollection);
     const q = query(
@@ -227,7 +227,7 @@ export class MessageService {
     );
 
     return onSnapshot(q, async (snapshot) => {
-      console.log('[MSG] 📱 Conversations snapshot received:', snapshot.docs.length, 'conversations');
+      console.log('📱 Conversations snapshot received:', snapshot.docs.length, 'conversations');
       const conversations: Conversation[] = [];
 
       for (const docSnap of snapshot.docs) {
@@ -235,12 +235,12 @@ export class MessageService {
 
         // Skip if this user has deleted the conversation
         if (data.deletedBy?.[userId]) {
-          console.log('[MSG] ⏭️ Skipping deleted conversation:', docSnap.id, 'deletedBy:', data.deletedBy);
+          console.log('⏭️ Skipping deleted conversation:', docSnap.id, 'deletedBy:', data.deletedBy);
           continue;
         }
 
         // Debug: Log conversation data to see what's being received
-        console.log('[MSG] 🔍 Processing conversation:', docSnap.id, 'deletedBy:', data.deletedBy, 'userId:', userId);
+        console.log('🔍 Processing conversation:', docSnap.id, 'deletedBy:', data.deletedBy, 'userId:', userId);
 
         const otherUserId = data.participants.find((id: string) => id !== userId);
 
@@ -280,12 +280,12 @@ export class MessageService {
         }
       }
 
-      console.log('[MSG] ✅ Real-time conversations updated:', conversations.length);
+      console.log('✅ Real-time conversations updated:', conversations.length);
       callback(conversations);
     }, (error: any) => {
       // Suppress permission errors when user is logged out
       if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
-        console.log('[MSG] ⚠️ Conversations listener: User logged out, ignoring permission error');
+        console.log('⚠️ Conversations listener: User logged out, ignoring permission error');
         callback([]);
       } else {
         console.error('❌ Error in conversations listener:', error);
@@ -316,10 +316,10 @@ export class MessageService {
       const wasRecipientDeleted = existingData?.deletedBy?.[recipientId];
 
       if (wasSenderDeleted) {
-        console.log(`[MSG] 🔄 Un-deleting conversation for sender: ${senderId}`);
+        console.log(`🔄 Un-deleting conversation for sender: ${senderId}`);
       }
       if (wasRecipientDeleted) {
-        console.log(`[MSG] 🔄 Un-deleting conversation for recipient: ${recipientId}`);
+        console.log(`🔄 Un-deleting conversation for recipient: ${recipientId}`);
       }
 
       const conversationData: any = {
@@ -346,7 +346,7 @@ export class MessageService {
       await updateDoc(conversationRef, {
         [`unreadCounts.${recipientId}`]: increment(1),
       });
-      console.log('[MSG] ✅ Incremented unread count for recipient:', recipientId);
+      console.log('✅ Incremented unread count for recipient:', recipientId);
 
       // Clear deletedBy for both users when a message is sent
       // Must be done separately after setDoc because deleteField() doesn't work with setDoc merge
@@ -360,10 +360,10 @@ export class MessageService {
 
       if (Object.keys(fieldsToDelete).length > 0) {
         await updateDoc(conversationRef, fieldsToDelete);
-        console.log('[MSG] ✅ Removed users from deletedBy:', Object.keys(fieldsToDelete));
+        console.log('✅ Removed users from deletedBy:', Object.keys(fieldsToDelete));
       }
 
-      console.log('[MSG] ✅ Updated conversation:', conversationId);
+      console.log('✅ Updated conversation:', conversationId);
     } catch (error) {
       console.error('❌ Error updating conversation:', error);
       // Don't throw here as it's not critical
@@ -382,7 +382,7 @@ export class MessageService {
     recipientId: string
   ): Promise<void> {
     try {
-      console.log('[MSG] 📖 Marking messages as read from', senderId, 'to', recipientId);
+      console.log('📖 Marking messages as read from', senderId, 'to', recipientId);
 
       const messagesRef = collection(db, this.messagesCollection);
       const q = query(
@@ -400,15 +400,7 @@ export class MessageService {
       });
 
       await batch.commit();
-      console.log('[MSG] ✅ Marked messages as read');
-
-      // Also reset the unread count on the conversation document
-      const conversationId = [senderId, recipientId].sort().join('_');
-      const conversationRef = doc(db, this.conversationsCollection, conversationId);
-      await updateDoc(conversationRef, {
-        [`unreadCounts.${recipientId}`]: 0,
-      });
-      console.log('[MSG] ✅ Reset unread count for conversation');
+      console.log('✅ Marked messages as read');
     } catch (error) {
       console.error('❌ Error marking messages as read:', error);
       throw error;
@@ -418,7 +410,7 @@ export class MessageService {
   // Get user by ID from both tables
   static async getUserById(userId: string): Promise<AnyUser | null> {
     try {
-      console.log('[MSG] 🔍 Getting user by ID:', userId);
+      console.log('🔍 Getting user by ID:', userId);
 
       // Import AirtableService here to avoid circular dependency
       const { AirtableService } = await import('./airtable');
@@ -432,11 +424,11 @@ export class MessageService {
   // Delete conversation for a specific user (soft delete)
   static async deleteConversation(conversationId: string, userId: string): Promise<void> {
     try {
-      console.log('[MSG] 🗑️ Deleting conversation:', { conversationId, userId });
+      console.log('🗑️ Deleting conversation:', { conversationId, userId });
 
       // The conversationId is in format "userId1_userId2" (sorted)
       const [userId1, userId2] = conversationId.split('_');
-      console.log('[MSG] 🗑️ Conversation participants:', { userId1, userId2 });
+      console.log('🗑️ Conversation participants:', { userId1, userId2 });
 
       const conversationRef = doc(db, this.conversationsCollection, conversationId);
 
@@ -445,7 +437,7 @@ export class MessageService {
         [`deletedBy.${userId}`]: serverTimestamp(),
       });
 
-      console.log('[MSG] ✅ Marked conversation as deleted for user');
+      console.log('✅ Marked conversation as deleted for user');
 
       // Also mark all messages in this conversation as deleted for this user
       const messagesRef = collection(db, this.messagesCollection);
@@ -488,12 +480,12 @@ export class MessageService {
         });
 
         await batch.commit();
-        console.log(`[MSG] ✅ Successfully marked ${totalMessages} messages as deleted for user ${userId}`);
+        console.log(`✅ Successfully marked ${totalMessages} messages as deleted for user ${userId}`);
       } else {
-        console.log('[MSG] ⚠️ No messages found to delete');
+        console.log('⚠️ No messages found to delete');
       }
 
-      console.log('[MSG] ✅ Successfully deleted conversation and all messages');
+      console.log('✅ Successfully deleted conversation and all messages');
     } catch (error) {
       console.error('❌ Error deleting conversation:', error);
       throw error;
@@ -503,7 +495,7 @@ export class MessageService {
   // Delete a single message for a specific user (soft delete)
   static async deleteMessage(messageId: string, userId: string): Promise<void> {
     try {
-      console.log('[MSG] 🗑️ Deleting message for user:', messageId, userId);
+      console.log('🗑️ Deleting message for user:', messageId, userId);
 
       const messageRef = doc(db, this.messagesCollection, messageId);
 
@@ -512,7 +504,7 @@ export class MessageService {
         [`deletedBy.${userId}`]: serverTimestamp(),
       }, { merge: true });
 
-      console.log('[MSG] ✅ Successfully marked message as deleted for user');
+      console.log('✅ Successfully marked message as deleted for user');
     } catch (error) {
       console.error('❌ Error deleting message:', error);
       throw error;
@@ -522,7 +514,7 @@ export class MessageService {
   // Initialize conversations from existing messages
   static async initializeConversationsFromMessages(userId: string): Promise<void> {
     try {
-      console.log('[MSG] 🔄 Initializing conversations from existing messages for user:', userId);
+      console.log('🔄 Initializing conversations from existing messages for user:', userId);
 
       const messagesRef = collection(db, this.messagesCollection);
 
@@ -546,7 +538,7 @@ export class MessageService {
           const convId = this.getConversationId(userId, data.recipientId);
           const existing = conversationPairs.get(convId);
           if (!existing || (data.timestamp as Timestamp)?.toMillis() > existing.lastMessageTime?.toMillis()) {
-            console.log(`[MSG] 📤 Adding sent message to conversation ${convId}: "${data.content}"`);
+            console.log(`📤 Adding sent message to conversation ${convId}: "${data.content}"`);
             conversationPairs.set(convId, {
               otherUserId: data.recipientId,
               lastMessage: data.content,
@@ -554,7 +546,7 @@ export class MessageService {
             });
           }
         } else if (isDeleted) {
-          console.log(`[MSG] ⏭️ Skipping deleted sent message: ${docSnap.id}`);
+          console.log(`⏭️ Skipping deleted sent message: ${docSnap.id}`);
         }
       });
 
@@ -566,7 +558,7 @@ export class MessageService {
           const convId = this.getConversationId(userId, data.senderId);
           const existing = conversationPairs.get(convId);
           if (!existing || (data.timestamp as Timestamp)?.toMillis() > existing.lastMessageTime?.toMillis()) {
-            console.log(`[MSG] 📥 Adding received message to conversation ${convId}: "${data.content}"`);
+            console.log(`📥 Adding received message to conversation ${convId}: "${data.content}"`);
             conversationPairs.set(convId, {
               otherUserId: data.senderId,
               lastMessage: data.content,
@@ -574,11 +566,11 @@ export class MessageService {
             });
           }
         } else if (isDeleted) {
-          console.log(`[MSG] ⏭️ Skipping deleted received message: ${docSnap.id}`);
+          console.log(`⏭️ Skipping deleted received message: ${docSnap.id}`);
         }
       });
 
-      console.log('[MSG] 📱 Found', conversationPairs.size, 'unique conversations to initialize');
+      console.log('📱 Found', conversationPairs.size, 'unique conversations to initialize');
 
       // Create/update conversation documents
       const { AirtableService } = await import('./airtable');
@@ -588,17 +580,17 @@ export class MessageService {
 
         // Check if conversation exists and if current user has deleted it
         const conversationSnap = await getDoc(conversationRef);
-        console.log(`[MSG] 🔍 Checking conversation ${convId}: exists=${conversationSnap.exists()}`);
+        console.log(`🔍 Checking conversation ${convId}: exists=${conversationSnap.exists()}`);
         if (conversationSnap.exists()) {
           const conversationData = conversationSnap.data();
-          console.log(`[MSG] 🔍 Conversation data:`, {
+          console.log(`🔍 Conversation data:`, {
             convId,
             deletedBy: conversationData?.deletedBy,
             deletedByUserId: conversationData?.deletedBy?.[userId],
             userId
           });
           if (conversationData?.deletedBy?.[userId]) {
-            console.log('[MSG] ⏭️ Skipping initialization for deleted conversation:', convId);
+            console.log('⏭️ Skipping initialization for deleted conversation:', convId);
             continue;
           }
         }
@@ -627,7 +619,7 @@ export class MessageService {
         }, { merge: true }); // Use merge: true to preserve existing fields like deletedBy
       }
 
-      console.log('[MSG] ✅ Conversations initialized successfully');
+      console.log('✅ Conversations initialized successfully');
     } catch (error) {
       console.error('❌ Error initializing conversations:', error);
       // Don't throw - this is a background initialization
@@ -641,14 +633,14 @@ export class MessageService {
     messageContent: string
   ): Promise<void> {
     try {
-      console.log('[MSG] 📱 Sending push notification to recipient:', recipientId);
+      console.log('📱 Sending push notification to recipient:', recipientId);
 
       // Get recipient's push token from Airtable
       const { AirtableService } = await import('./airtable');
       const pushToken = await AirtableService.getPushTokenByUID(recipientId);
 
       if (!pushToken) {
-        console.log('[MSG] ⚠️ No push token found for recipient:', recipientId);
+        console.log('⚠️ No push token found for recipient:', recipientId);
         return;
       }
 
@@ -665,7 +657,7 @@ export class MessageService {
         { type: 'message', senderId: recipientId }
       );
 
-      console.log('[MSG] ✅ Push notification sent successfully');
+      console.log('✅ Push notification sent successfully');
     } catch (error) {
       console.error('❌ Error sending push notification:', error);
       // Don't throw - notification failure shouldn't block message sending

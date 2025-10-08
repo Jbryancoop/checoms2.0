@@ -1,19 +1,47 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AirtableService } from './airtable';
 import { AuthService } from './auth';
 
+// Track if user is on Messages screen
+let isOnMessagesScreen = false;
+
+// Storage key for tracking if push token has been registered for this app install
+const PUSH_TOKEN_REGISTERED_KEY = 'push_token_registered';
+
 // Configure notification behavior
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    // Don't show notification if app is in foreground and user is on Messages screen
+    const appState = AppState.currentState;
+    const isMessageNotification = notification.request.content.data?.type === 'message';
+
+    if (appState === 'active' && isOnMessagesScreen && isMessageNotification) {
+      return {
+        shouldShowBanner: false,
+        shouldShowList: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    return {
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export class NotificationService {
+  // Set whether user is on Messages screen
+  static setOnMessagesScreen(value: boolean): void {
+    isOnMessagesScreen = value;
+  }
+
   // Request notification permissions
   static async requestPermissions(): Promise<boolean> {
     try {
@@ -42,9 +70,16 @@ export class NotificationService {
     }
   }
 
-  // Get push token and register with Airtable
+  // Get push token and register with Airtable (only on first login after app install)
   static async registerForPushNotifications(): Promise<string | null> {
     try {
+      // Check if we've already registered a push token for this app install
+      const alreadyRegistered = await AsyncStorage.getItem(PUSH_TOKEN_REGISTERED_KEY);
+      if (alreadyRegistered) {
+        console.log('📱 Push token already registered for this app install, skipping');
+        return alreadyRegistered;
+      }
+
       const hasPermission = await this.requestPermissions();
       if (!hasPermission) return null;
 
@@ -64,15 +99,18 @@ export class NotificationService {
       // Determine if user is staff or regular user and update accordingly
       if ('CHE Email' in userInfo) {
         // This is a staff member (Leader)
-        console.log('📱 Registering push token for staff member:', email);
+        console.log('📱 Registering push token for staff member (FIRST TIME):', email);
         await AirtableService.updateStaffPushToken(email, token);
       } else if ('Email' in userInfo) {
         // This is a regular user
-        console.log('📱 Registering push token for user:', email);
+        console.log('📱 Registering push token for user (FIRST TIME):', email);
         await AirtableService.updateUserPushToken(email, token);
       }
 
-      console.log('✅ Push token registered:', token);
+      // Mark as registered so we don't update again
+      await AsyncStorage.setItem(PUSH_TOKEN_REGISTERED_KEY, token);
+
+      console.log('✅ Push token registered (first time for this app install):', token);
       return token;
     } catch (error) {
       console.error('❌ Error registering for push notifications:', error);

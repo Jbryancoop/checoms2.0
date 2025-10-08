@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DirectoryScreen from './DirectoryScreen';
 import CalendarScreen from './CalendarScreen';
 import WaiversScreen from './WaiversScreen';
+import AlertsScreen from './AlertsScreen';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
 
@@ -21,7 +22,7 @@ interface InfoCard {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   action?: {
-    type: 'link' | 'email' | 'phone' | 'directory' | 'calendar' | 'waivers';
+    type: 'link' | 'email' | 'phone' | 'directory' | 'calendar' | 'waivers' | 'alerts';
     value: string;
     label: string;
   };
@@ -31,6 +32,7 @@ export default function InfoScreen() {
   const [showDirectory, setShowDirectory] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showWaivers, setShowWaivers] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -48,6 +50,17 @@ export default function InfoScreen() {
     },
     {
       id: '2',
+      title: 'Alerts History',
+      description: 'View all current and past alerts with full details.',
+      icon: 'notifications',
+      action: {
+        type: 'alerts',
+        value: 'alerts',
+        label: 'View Alerts',
+      },
+    },
+    {
+      id: '3',
       title: 'Key Dates',
       description: 'Important dates, deadlines, and events for the current academic year.',
       icon: 'calendar',
@@ -58,7 +71,7 @@ export default function InfoScreen() {
       },
     },
     {
-      id: '3',
+      id: '4',
       title: 'Tech Support',
       description: 'Get help with technical issues, password resets, and IT support.',
       icon: 'help-circle',
@@ -69,7 +82,7 @@ export default function InfoScreen() {
       },
     },
     {
-      id: '4',
+      id: '5',
       title: 'Liability Waivers',
       description: 'View and search student liability waivers on file.',
       icon: 'document-text',
@@ -80,7 +93,7 @@ export default function InfoScreen() {
       },
     },
     {
-      id: '5',
+      id: '6',
       title: 'Campus Directory',
       description: 'Directory of all CHE staff members with contact information.',
       icon: 'location',
@@ -119,6 +132,9 @@ export default function InfoScreen() {
           break;
         case 'waivers':
           setShowWaivers(true);
+          break;
+        case 'alerts':
+          setShowAlerts(true);
           break;
       }
     } catch (error) {
@@ -162,6 +178,10 @@ export default function InfoScreen() {
     return <WaiversScreen onBack={() => setShowWaivers(false)} />;
   }
 
+  if (showAlerts) {
+    return <AlertsScreen onBack={() => setShowAlerts(false)} />;
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
@@ -172,12 +192,6 @@ export default function InfoScreen() {
       </View>
 
       {infoCards.map(renderInfoCard)}
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Need help? Contact your campus director or tech support.
-        </Text>
-      </View>
     </ScrollView>
   );
 }
@@ -260,19 +274,5 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     fontSize: 16,
     color: colors.primary,
     fontWeight: '500',
-  },
-  footer: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  footerText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
   },
 });

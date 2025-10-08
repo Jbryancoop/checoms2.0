@@ -15,6 +15,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
 import { AirtableService } from '../services/airtable';
 import { AuthService } from '../services/auth';
+import PreloadService from '../services/preloadService';
 
 interface Student {
   id: string;
@@ -43,7 +44,6 @@ export default function AttendanceScreen() {
         const authResult = await AuthService.getCurrentUserWithStaffInfo();
         if (authResult?.userInfo?.id) {
           setCurrentUserId(authResult.userInfo.id);
-          console.log('👤 Current user ID:', authResult.userInfo.id);
         }
       } catch (error) {
         console.error('Error getting current user:', error);
@@ -84,27 +84,23 @@ export default function AttendanceScreen() {
   const loadStudentsForDate = useCallback(async (date: Date) => {
     try {
       const dateStr = formatDate(date);
-      console.log('📅 Loading students for date:', dateStr);
-      console.log('👤 Using leader ID for filter:', currentUserId);
 
       if (!currentUserId) {
-        console.log('⚠️ No current user ID yet, skipping load');
         setLoading(false);
         setRefreshing(false);
         return;
       }
 
+      // Check if attendance is preloaded for this date
+      const preloadedAttendance = PreloadService.getPreloadedAttendance(dateStr);
+
       // Fetch students and attendance records in parallel
       const [allStudents, attendanceRecords] = await Promise.all([
         AirtableService.getAllStudentsWithSessionDates(currentUserId),
-        AirtableService.getAttendanceRecordsForDate(dateStr),
+        preloadedAttendance !== null
+          ? Promise.resolve(preloadedAttendance)
+          : AirtableService.getAttendanceRecordsForDate(dateStr),
       ]);
-
-      console.log('📊 ========== PROCESSING STUDENTS ==========');
-      console.log('📊 All students:', allStudents.length);
-      console.log('📊 Attendance records:', attendanceRecords.length);
-      console.log('📊 Student IDs:', allStudents.map(s => s.id));
-      console.log('📊 Attendance appIDs:', attendanceRecords.map(r => r.appID));
 
       // Process students
       const processedStudents: Student[] = allStudents.map(student => {
@@ -119,8 +115,6 @@ export default function AttendanceScreen() {
         const attendanceRecord = attendanceRecords.find(
           record => record.appID === student.id
         );
-
-        console.log('🔍 Student:', student.Student, 'ID:', student.id, 'Attendance Record Found:', !!attendanceRecord);
 
         return {
           id: student.id,
@@ -343,6 +337,7 @@ const createStyles = (colors: typeof ThemeColors.light) =>
     dateList: {
       paddingHorizontal: 12,
       paddingVertical: 8,
+      paddingBottom: 24,
     },
     dateItem: {
       width: 50,
@@ -378,6 +373,7 @@ const createStyles = (colors: typeof ThemeColors.light) =>
     },
     studentList: {
       padding: 20,
+      paddingTop: 8,
     },
     studentRow: {
       flexDirection: 'row',

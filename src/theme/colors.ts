@@ -1,7 +1,7 @@
 export const Colors = {
   light: {
     // Backgrounds
-    background: '#f2f2f7',
+    background: '#F2F1ED',
     card: '#ffffff',
     surface: '#ffffff',
 
@@ -11,8 +11,11 @@ export const Colors = {
     textTertiary: '#c7c7cc',
 
     // Brand
-    primary: '#007AFF',
+    primary: '#FB4D18',
     primaryText: '#ffffff',
+
+    // Navigation
+    headerBackground: '#C9BC96',
 
     // Status
     success: '#34C759',
@@ -24,7 +27,7 @@ export const Colors = {
     separator: '#e5e5ea',
 
     // Message bubbles
-    sentBubble: '#007AFF',
+    sentBubble: '#1F514A',
     sentText: '#ffffff',
     receivedBubble: '#ffffff',
     receivedText: '#000000',
@@ -45,8 +48,11 @@ export const Colors = {
     textTertiary: '#48484a',
 
     // Brand
-    primary: '#0a84ff',
+    primary: '#FB4D18',
     primaryText: '#ffffff',
+
+    // Navigation
+    headerBackground: '#2c2c2e',
 
     // Status
     success: '#32d74b',
@@ -58,7 +64,7 @@ export const Colors = {
     separator: '#38383a',
 
     // Message bubbles
-    sentBubble: '#0a84ff',
+    sentBubble: '#1F514A',
     sentText: '#ffffff',
     receivedBubble: '#2c2c2e',
     receivedText: '#ffffff',

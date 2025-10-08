@@ -26,22 +26,41 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   // Configure Google Sign-In on component mount
   useEffect(() => {
     AuthService.configureGoogleSignIn();
-    console.log('🔥 Firebase Auth instance:', auth);
-    console.log('🔥 Current user:', auth.currentUser);
   }, []);
 
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
-      console.log('🚀 Starting native Google sign-in...');
-      
+
       const authResult = await AuthService.signInWithGoogle();
       if (authResult) {
-        console.log('✅ Firebase authentication successful');
         onAuthSuccess();
       }
     } catch (error: any) {
-      console.error('❌ Google sign-in error:', error);
+      // Check if user cancelled the sign-in process
+      const errorCode = error?.code || '';
+      const errorMessage = error?.message || '';
+
+      // Common cancellation error codes from Google Sign-In
+      const cancellationCodes = [
+        'SIGN_IN_CANCELLED',
+        '-5', // iOS cancellation
+        '12501', // Android cancellation
+        'ERROR_CANCELLED',
+      ];
+
+      const isCancellation =
+        cancellationCodes.some(code => errorCode.includes(code)) ||
+        errorMessage.toLowerCase().includes('cancel') ||
+        errorMessage.toLowerCase().includes('user cancelled');
+
+      // If user cancelled, just return - don't show an error alert
+      if (isCancellation) {
+        return;
+      }
+
+      // For actual errors, show the alert
+      console.error('Google sign-in error:', error);
       Alert.alert(
         'Authentication Error',
         error.message || 'An error occurred during authentication. Please try again.'
@@ -55,37 +74,35 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     <View style={styles.container}>
       <View style={styles.content}>
         <Image
-          source={require('../../assets/icon.png')}
+          source={require('../../assets/che-logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
         
-        <Text style={styles.title}>CHE Staff Communication</Text>
+        <Text style={styles.title}>CHE Comms</Text>
         <Text style={styles.subtitle}>
-          Sign in with your CHE or VentureOff Google account
+          Sign in with your CHE Google account
         </Text>
 
         <TouchableOpacity
           style={[styles.signInButton, isLoading && styles.signInButtonDisabled]}
           onPress={signInWithGoogle}
           disabled={isLoading}
+          activeOpacity={0.8}
         >
           {isLoading ? (
-            <ActivityIndicator color={colors.primaryText} />
+            <ActivityIndicator color="#1f1f1f" />
           ) : (
             <>
               <Image
-                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                style={styles.googleLogo}
+                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/480px-Google_%22G%22_logo.svg.png' }}
+                style={styles.googleIconContainer}
+                resizeMode="contain"
               />
               <Text style={styles.signInButtonText}>Sign in with Google</Text>
             </>
           )}
         </TouchableOpacity>
-
-        <Text style={styles.disclaimer}>
-          Only @che.school and @ventureoff.org email addresses are authorized to use this app.
-        </Text>
       </View>
     </View>
   );
@@ -124,26 +141,39 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
   signInButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#747775',
     marginBottom: 30,
-    minWidth: 200,
-    justifyContent: 'center',
+    height: 40,
+    minWidth: 'auto',
+    maxWidth: 400,
+    overflow: 'hidden',
+    shadowColor: 'rgba(60, 64, 67, 0.3)',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 1,
+    elevation: 2,
   },
   signInButtonDisabled: {
-    backgroundColor: colors.separator,
+    backgroundColor: 'rgba(255, 255, 255, 0.38)',
+    borderColor: 'rgba(31, 31, 31, 0.12)',
   },
-  googleLogo: {
+  googleIconContainer: {
     width: 20,
     height: 20,
     marginRight: 12,
   },
   signInButtonText: {
-    color: colors.primaryText,
-    fontSize: 16,
+    color: '#1f1f1f',
+    fontSize: 14,
     fontWeight: '500',
+    letterSpacing: 0.25,
   },
   disclaimer: {
     fontSize: 12,

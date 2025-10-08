@@ -23,10 +23,9 @@ export class AuthService {
     });
   }
 
-  // Check if email is authorized (CHE or VentureOff domain)
+  // Check if email is authorized (CHE domain only)
   static isAuthorizedEmail(email: string): boolean {
-    const authorizedDomains = ['@che.school', '@ventureoff.org'];
-    return authorizedDomains.some(domain => email.endsWith(domain));
+    return email.endsWith('@che.school');
   }
 
   // Sign in with Google using native Google Sign-In
@@ -54,21 +53,16 @@ export class AuthService {
         throw new Error('No email found in Google account');
       }
 
-      console.log('Google sign-in attempt for email:', user.email);
-
       // Check if email is authorized
       if (!this.isAuthorizedEmail(user.email)) {
         await this.signOut();
-        throw new Error('Email domain not authorized. Only @che.school and @ventureoff.org emails are allowed.');
+        throw new Error('Email domain not authorized. Only @che.school emails are allowed.');
       }
 
       // Get user info from Airtable (check both Staff and Users tables)
-      console.log('🔍 About to call AirtableService.getAnyUserByEmail with:', user.email);
       const userInfo = await AirtableService.getAnyUserByEmail(user.email);
-      console.log('🔍 AirtableService.getAnyUserByEmail result:', userInfo);
 
       if (!userInfo) {
-        console.log('❌ No user info found, signing out...');
         await this.signOut();
         throw new Error('Email not found in user database. Please contact your administrator.');
       }
@@ -77,15 +71,12 @@ export class AuthService {
       try {
         // Try to update in Leaders table first
         await AirtableService.updateStaffUID(user.email, user.uid);
-        console.log('✅ Successfully updated UID in Leaders table');
       } catch (error) {
         // This is expected if user is in Users table instead of Leaders table
-        console.log('ℹ️ User not found in Leaders table, trying Users table...');
         try {
           await AirtableService.updateUserUID(user.email, user.uid);
-          console.log('✅ Successfully updated UID in Users table');
         } catch (userError) {
-          console.warn('⚠️ Failed to update UID in Users table:', userError);
+          console.warn('Failed to update UID:', userError);
           // Don't fail the authentication if UID update fails
         }
       }

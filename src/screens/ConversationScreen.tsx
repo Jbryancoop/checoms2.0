@@ -11,11 +11,14 @@ import {
   Alert,
   ActivityIndicator,
   Keyboard,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+// import * as ImagePicker from 'expo-image-picker';
 import { MessageService } from '../services/messageService';
 import { AuthService } from '../services/auth';
+import { NotificationService } from '../services/notifications';
 import { AnyUser, Message } from '../types';
 import ProfileImage from '../components/ProfileImage';
 import { useTheme } from '../contexts/ThemeContext';
@@ -30,6 +33,7 @@ interface ConversationScreenProps {
 export default function ConversationScreen({ recipient, onBack }: ConversationScreenProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  // const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [currentUser, setCurrentUser] = useState<AnyUser | null>(null);
@@ -41,7 +45,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    
+
     const initializeMessages = async () => {
       const user = await loadCurrentUser();
       // Only load messages after current user is loaded
@@ -49,9 +53,9 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
         unsubscribe = await loadMessages(user);
       }
     };
-    
+
     initializeMessages();
-    
+
     // Cleanup function
     return () => {
       if (unsubscribe) {
@@ -59,6 +63,17 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       }
     };
   }, []); // Run once on mount
+
+  // Track when user is viewing a conversation to suppress push notifications
+  useEffect(() => {
+    // User is viewing conversation - suppress message notifications
+    NotificationService.setOnMessagesScreen(true);
+
+    return () => {
+      // User left conversation - allow message notifications
+      NotificationService.setOnMessagesScreen(false);
+    };
+  }, []);
 
   // Keyboard event listeners
   useEffect(() => {
@@ -92,7 +107,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       }
       return null;
     } catch (error) {
-      console.error('Error loading current user:', error);
+      console.error('[MSG] Error loading current user:', error);
       return null;
     }
   };
@@ -100,22 +115,25 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
   const loadMessages = async (user?: AnyUser) => {
     try {
       setIsLoading(true);
-      
+
       const userToUse = user || currentUser;
       if (!userToUse?.UID) {
-        console.error('No current user UID available');
+        console.error('[MSG] No current user UID available');
         setIsLoading(false);
         return;
       }
 
-      console.log('📨 Setting up message listener for user:', userToUse.UID, 'recipient:', recipient.UID || recipient.id);
+      // Mark messages from recipient as read
+      await MessageService.markMessagesAsRead(
+        recipient.UID || recipient.id,
+        userToUse.UID
+      );
 
       // Set up real-time listener for messages
       const unsubscribe = MessageService.getMessages(
         userToUse.UID,
         recipient.UID || recipient.id,
         (messages) => {
-          console.log('📨 Received messages from Firebase:', messages.length);
           setMessages(messages);
           setIsLoading(false);
         }
@@ -124,11 +142,35 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
       // Store unsubscribe function for cleanup
       return unsubscribe;
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error('[MSG] Error loading messages:', error);
       Alert.alert('Error', 'Failed to load messages');
       setIsLoading(false);
     }
   };
+
+  // const pickImage = async () => {
+  //   try {
+  //     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  //     if (status !== 'granted') {
+  //       Alert.alert('Permission needed', 'Please allow access to your photos to send images.');
+  //       return;
+  //     }
+
+  //     const result = await ImagePicker.launchImageLibraryAsync({
+  //       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  //       allowsEditing: true,
+  //       aspect: [4, 3],
+  //       quality: 0.8,
+  //     });
+
+  //     if (!result.canceled && result.assets[0]) {
+  //       setSelectedImage(result.assets[0].uri);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error picking image:', error);
+  //     Alert.alert('Error', 'Failed to select image');
+  //   }
+  // };
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !currentUser?.UID) return;
@@ -138,8 +180,6 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
     setIsSending(true);
 
     try {
-      console.log('📤 Sending message to Firebase...');
-      
       await MessageService.sendMessage(
         currentUser.UID,
         currentUser['Full Name'],
@@ -149,10 +189,8 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
         'CHE Email' in recipient ? recipient['CHE Email'] : recipient['Email'],
         messageContent
       );
-      
-      console.log('✅ Message sent successfully');
     } catch (error) {
-      console.error('❌ Error sending message:', error);
+      console.error('[MSG] Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
     } finally {
       setIsSending(false);
@@ -180,6 +218,9 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
         styles.messageBubble,
         item.isFromCurrentUser ? styles.sentBubble : styles.receivedBubble
       ]}>
+        {/* {item.imageUrl && (
+          <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
+        )} */}
         <Text style={[
           styles.messageText,
           item.isFromCurrentUser ? styles.sentText : styles.receivedText
@@ -282,10 +323,6 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
 
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
-            <TouchableOpacity style={styles.attachButton}>
-              <Ionicons name="add" size={24} color={colors.primary} />
-            </TouchableOpacity>
-
             <TextInput
               style={styles.textInput}
               value={newMessage}
@@ -531,4 +568,27 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
+  // imagePreviewContainer: {
+  //   position: 'relative',
+  //   marginBottom: 8,
+  //   alignSelf: 'flex-start',
+  // },
+  // imagePreview: {
+  //   width: 120,
+  //   height: 120,
+  //   borderRadius: 8,
+  // },
+  // removeImageButton: {
+  //   position: 'absolute',
+  //   top: -8,
+  //   right: -8,
+  //   backgroundColor: colors.background,
+  //   borderRadius: 12,
+  // },
+  // messageImage: {
+  //   width: 200,
+  //   height: 200,
+  //   borderRadius: 12,
+  //   marginTop: 8,
+  // },
 });

@@ -226,7 +226,7 @@ export class AirtableService {
         .select({
           filterByFormula: `LOWER({CHE Email}) = LOWER('${email}')`,
           maxRecords: 1,
-          fields: ['CHE Email', 'Push Token'], // Only need these fields for update
+          fields: ['CHE Email', 'Push Token'],
         })
         .firstPage();
 
@@ -254,6 +254,7 @@ export class AirtableService {
         .select({
           filterByFormula: `LOWER({Email}) = LOWER('${email}')`,
           maxRecords: 1,
+          fields: ['Email', 'Push Token'],
         })
         .firstPage();
 

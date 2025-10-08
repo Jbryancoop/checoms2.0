@@ -8,12 +8,14 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Animated,
-  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MessageService } from '../services/messageService';
 import { AuthService } from '../services/auth';
+import { NotificationService } from '../services/notifications';
 import { AnyUser, Conversation } from '../types';
 import UserSelectionScreen from './UserSelectionScreen';
 import ConversationScreen from './ConversationScreen';
@@ -42,6 +44,14 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (currentUser) {
       loadConversations();
+    } else {
+      // Clear conversations when user logs out
+      setConversations([]);
+      // Unsubscribe from any active listeners
+      if (conversationsUnsubscribe) {
+        conversationsUnsubscribe();
+        setConversationsUnsubscribe(null);
+      }
     }
 
     return () => {
@@ -51,30 +61,43 @@ export default function MessagesScreen() {
     };
   }, [currentUser]);
 
+  // Track when user is on Messages screen to suppress push notifications
+  useFocusEffect(
+    React.useCallback(() => {
+      // Screen is focused - suppress message notifications
+      NotificationService.setOnMessagesScreen(true);
+
+      return () => {
+        // Screen is unfocused - allow message notifications
+        NotificationService.setOnMessagesScreen(false);
+      };
+    }, [])
+  );
+
   const loadCurrentUser = async () => {
     try {
-      console.log('🔄 Loading current user...');
+      console.log('[MSG] 🔄 Loading current user...');
       const authResult = await AuthService.getCurrentUserWithStaffInfo();
       if (authResult) {
-        console.log('✅ Current user loaded:', authResult.userInfo);
+        console.log('[MSG] ✅ Current user loaded:', authResult.userInfo);
         setCurrentUser(authResult.userInfo);
       } else {
-        console.log('❌ No current user found');
+        console.log('[MSG] ❌ No current user found');
       }
     } catch (error) {
       console.error('Error loading current user:', error);
     }
   };
 
-  const loadConversations = () => {
+  const loadConversations = async () => {
     try {
       setIsLoading(true);
 
-      console.log('🔄 Loading conversations, currentUser:', currentUser);
-      console.log('🔄 Current user UID:', currentUser?.UID);
+      console.log('[MSG] 🔄 Loading conversations, currentUser:', currentUser);
+      console.log('[MSG] 🔄 Current user UID:', currentUser?.UID);
 
       if (!currentUser?.UID) {
-        console.log('No current user UID available, cannot load conversations');
+        console.log('[MSG] No current user UID available, cannot load conversations');
         setConversations([]);
         setIsLoading(false);
         return;
@@ -85,7 +108,7 @@ export default function MessagesScreen() {
       }
 
       const unsubscribe = MessageService.getConversationsRealtime(currentUser.UID, (data) => {
-        console.log('📱 Real-time conversations update:', data);
+        console.log('[MSG] 📱 Real-time conversations update:', data);
         setConversations(data);
         setIsLoading(false);
       });
@@ -100,6 +123,9 @@ export default function MessagesScreen() {
 
   const onRefresh = async () => {
     setIsRefreshing(true);
+    if (currentUser?.UID) {
+      await MessageService.initializeConversationsFromMessages(currentUser.UID);
+    }
     setTimeout(() => {
       setIsRefreshing(false);
     }, 1000);
@@ -135,9 +161,9 @@ export default function MessagesScreen() {
                 return;
               }
               await MessageService.deleteConversation(conversationId, currentUser.UID);
-              console.log('✅ Conversation deleted successfully');
+              console.log('[MSG] ✅ Conversation deleted successfully');
             } catch (error) {
-              console.error('❌ Error deleting conversation:', error);
+              console.error('[MSG] ❌ Error deleting conversation:', error);
               Alert.alert('Error', 'Failed to delete conversation. Please try again.');
             }
           },
@@ -163,49 +189,29 @@ export default function MessagesScreen() {
   };
 
   const SwipeableConversation = ({ item }: { item: Conversation }) => {
-    const translateX = useRef(new Animated.Value(0)).current;
-    const [showDelete, setShowDelete] = useState(false);
+    const swipeableRef = useRef<Swipeable>(null);
 
-    const panResponder = useRef(
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) => {
-          return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 100;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dx < 0) {
-            translateX.setValue(gestureState.dx);
-            setShowDelete(gestureState.dx < -50);
-          }
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dx < -100) {
-            Animated.spring(translateX, {
-              toValue: -100,
-              useNativeDriver: true,
-            }).start();
-            setShowDelete(true);
-          } else {
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-            }).start();
-            setShowDelete(false);
-          }
-        },
-      }),
-    ).current;
+    const renderRightActions = () => (
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => {
+          swipeableRef.current?.close();
+          handleDeleteConversation(item.id);
+        }}
+      >
+        <Ionicons name="trash" size={24} color={colors.primaryText} />
+        <Text style={styles.deleteButtonText}>Delete</Text>
+      </TouchableOpacity>
+    );
 
     return (
-      <View style={styles.swipeContainer}>
-        {showDelete && (
-          <View style={styles.rightActions}>
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteConversation(item.id)}>
-              <Ionicons name="trash" size={24} color={colors.primaryText} />
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        <Animated.View style={[styles.conversationCard, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={renderRightActions}
+        overshootRight={false}
+        rightThreshold={40}
+      >
+        <View style={styles.conversationCard}>
           <TouchableOpacity
             style={styles.conversationInfo}
             onPress={() => setSelectedRecipient(item.recipient)}
@@ -235,13 +241,13 @@ export default function MessagesScreen() {
               </View>
             </View>
           </TouchableOpacity>
-        </Animated.View>
-      </View>
+        </View>
+      </Swipeable>
     );
   };
 
   const renderConversation = ({ item }: { item: Conversation }) => {
-    console.log('🎨 Rendering conversation:', {
+    console.log('[MSG] 🎨 Rendering conversation:', {
       id: item.id,
       recipient: item.recipient,
       recipientName: item.recipient['Full Name'],
@@ -291,18 +297,18 @@ export default function MessagesScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <GestureHandlerRootView style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading conversations...</Text>
         </View>
-      </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       {renderHeader()}
 
       <FlatList
@@ -314,7 +320,7 @@ export default function MessagesScreen() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -450,30 +456,14 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
   },
-  swipeContainer: {
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  rightActions: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingRight: 16,
-    zIndex: 1,
-    backgroundColor: colors.background,
-  },
   deleteButton: {
     backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 80,
-    height: '100%',
+    width: 90,
+    marginBottom: 8,
+    marginRight: 16,
     borderRadius: 12,
-    marginLeft: 8,
   },
   deleteButtonText: {
     color: colors.primaryText,

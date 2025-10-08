@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
   Linking,
   Share,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AirtableService } from '../services/airtable';
 import { AuthService } from '../services/auth';
+import PreloadService from '../services/preloadService';
 import { Student, Leader } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
@@ -27,6 +29,7 @@ export default function WaiversScreen({ onBack }: WaiversScreenProps) {
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [waiverLink, setWaiverLink] = useState<string | null>(null);
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -36,34 +39,50 @@ export default function WaiversScreen({ onBack }: WaiversScreenProps) {
       setIsLoading(true);
       console.log('🔄 Loading students with waivers...');
 
-      // Load current user to get waiver link
-      const authResult = await AuthService.getCurrentUserWithStaffInfo();
-      console.log('🔍 Auth result:', authResult);
-      console.log('🔍 User info type:', typeof authResult?.userInfo);
-      console.log('🔍 User info keys:', authResult?.userInfo ? Object.keys(authResult.userInfo) : 'none');
-      console.log('🔍 User info (full):', JSON.stringify(authResult?.userInfo, null, 2));
+      // Try to use preloaded current user first
+      let currentUser = PreloadService.getPreloadedCurrentUser();
+      if (!currentUser) {
+        const authResult = await AuthService.getCurrentUserWithStaffInfo();
+        currentUser = authResult?.userInfo;
+      }
 
-      if (authResult) {
-        console.log('🔍 Has nonCheStudentWaiverLink property?', 'nonCheStudentWaiverLink' in authResult.userInfo);
+      if (currentUser) {
+        console.log('🔍 User info type:', typeof currentUser);
+        console.log('🔍 User info keys:', Object.keys(currentUser));
 
-        if ('nonCheStudentWaiverLink' in authResult.userInfo) {
-          const leader = authResult.userInfo as Leader;
-          console.log('🔍 Leader waiver link value:', leader.nonCheStudentWaiverLink);
-          console.log('🔍 Leader waiver link type:', typeof leader.nonCheStudentWaiverLink);
-          console.log('🔍 Leader waiver link truthy?', !!leader.nonCheStudentWaiverLink);
-
+        // Check if user has waiver link (Leaders table)
+        if ('nonCheStudentWaiverLink' in currentUser) {
+          const leader = currentUser as Leader;
           const linkValue = leader.nonCheStudentWaiverLink || null;
           console.log('🔍 Setting waiver link to:', linkValue);
           setWaiverLink(linkValue);
         } else {
-          console.log('❌ No nonCheStudentWaiverLink field found in user info');
-          console.log('❌ Available fields:', Object.keys(authResult.userInfo));
+          // User is in Users table, try to fetch from Leaders table by email
+          console.log('🔍 User is in Users table, checking Leaders table for waiver link...');
+          try {
+            const leaderInfo = await AirtableService.getStaffByEmail(currentUser.Email);
+            if (leaderInfo && 'nonCheStudentWaiverLink' in leaderInfo) {
+              const linkValue = leaderInfo.nonCheStudentWaiverLink || null;
+              console.log('🔍 Found waiver link in Leaders table:', linkValue);
+              setWaiverLink(linkValue);
+            } else {
+              console.log('🔍 No waiver link found in Leaders table');
+            }
+          } catch (error) {
+            console.log('🔍 User not found in Leaders table:', error);
+          }
         }
-      } else {
-        console.log('❌ No auth result');
       }
 
-      const allStudents = await AirtableService.getAllStudents();
+      // Try to use preloaded students first
+      let allStudents = PreloadService.getPreloadedStudents();
+      if (allStudents.length === 0) {
+        console.log('📱 Fetching students from Airtable...');
+        allStudents = await AirtableService.getAllStudents();
+      } else {
+        console.log('✅ Using preloaded students:', allStudents.length);
+      }
+
       console.log('📱 Received student data:', allStudents);
 
       // Sort by last name (extract last word from Name field)
@@ -80,6 +99,7 @@ export default function WaiversScreen({ onBack }: WaiversScreenProps) {
       Alert.alert('Error', 'Failed to load student waivers. Please try again.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -93,6 +113,13 @@ export default function WaiversScreen({ onBack }: WaiversScreenProps) {
     console.log('📌 waiverLink is truthy?', !!waiverLink);
     console.log('📌 Should show button?', !!waiverLink);
   }, [waiverLink]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    // Clear preloaded data to force fresh fetch
+    PreloadService.clearPreloadedData();
+    await loadStudents();
+  }, [loadStudents]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -282,6 +309,13 @@ export default function WaiversScreen({ onBack }: WaiversScreenProps) {
         style={styles.flatListStyle}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       />
     </View>
   );

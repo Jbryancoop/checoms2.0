@@ -1,18 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   ScrollView,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Linking,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../contexts/ThemeContext';
-import { RootTabParamList } from '../types';
+import { RootTabParamList, Alert } from '../types';
 import { Colors as ThemeColors } from '../theme/colors';
+import { AlertService } from '../services/alertService';
+import { AuthService } from '../services/auth';
 
 type NavigationProp = BottomTabNavigationProp<RootTabParamList, 'Home'>;
 
@@ -27,6 +31,55 @@ export default function HomeScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const authResult = await AuthService.getCurrentUserWithStaffInfo();
+      if (authResult?.userInfo) {
+        const userAlerts = await AlertService.getAlertsForUser(authResult.userInfo);
+        setAlerts(userAlerts);
+      }
+    } catch (error) {
+      console.error('Error loading alerts:', error);
+    }
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAlerts();
+    setRefreshing(false);
+  }, [loadAlerts]);
+
+  // Load alerts when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadAlerts();
+    }, [loadAlerts])
+  );
+
+  // Periodic polling for new alerts (every 5 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadAlerts();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [loadAlerts]);
+
+  const handleDismissAlert = async (alertId: string) => {
+    await AlertService.dismissAlert(alertId);
+    setAlerts(alerts.filter(a => a.id !== alertId));
+  };
+
+  const handleAlertAction = (alert: Alert) => {
+    if (alert['Action Link']) {
+      Linking.openURL(alert['Action Link']).catch(err => {
+        console.error('Failed to open link:', err);
+      });
+    }
+  };
 
   const sections: HomeSection[] = [
     {
@@ -34,6 +87,18 @@ export default function HomeScreen() {
       title: 'Staff Updates',
       description: 'Stay current with announcements, action items, and campus highlights.',
       icon: 'newspaper-outline',
+    },
+    {
+      key: 'Students',
+      title: 'Students',
+      description: 'View and manage student information for your classes.',
+      icon: 'school-outline',
+    },
+    {
+      key: 'Attendance',
+      title: 'Attendance',
+      description: 'Track and manage student attendance for your classes.',
+      icon: 'checkmark-circle-outline',
     },
     {
       key: 'Info',
@@ -60,13 +125,90 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <View style={styles.header}>
-          <Text style={styles.welcomeTitle}>Welcome to CHE Communicator</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Choose a section below to jump into updates, resources, or conversations.
-          </Text>
+          <Text style={styles.welcomeTitle}>CHE Comms</Text>
         </View>
+
+        {/* Alert Banners */}
+        {alerts.map(alert => (
+          <View
+            key={alert.id}
+            style={[
+              styles.alertBanner,
+              {
+                backgroundColor: AlertService.getPriorityBackgroundColor(alert.Priority),
+                borderColor: AlertService.getPriorityBorderColor(alert.Priority),
+              }
+            ]}
+          >
+            <View style={styles.alertIconContainer}>
+              <Ionicons
+                name={AlertService.getPriorityIcon(alert.Priority) as any}
+                size={28}
+                color={AlertService.getPriorityColor(alert.Priority)}
+              />
+            </View>
+            <View style={styles.alertContent}>
+              <Text
+                style={[
+                  styles.alertTitle,
+                  { color: AlertService.getPriorityColor(alert.Priority) }
+                ]}
+              >
+                {alert.Title}
+              </Text>
+              <Text
+                style={[
+                  styles.alertMessage,
+                  { color: AlertService.getPriorityColor(alert.Priority) }
+                ]}
+              >
+                {alert.Message}
+              </Text>
+              {alert['Action Link'] && (
+                <TouchableOpacity
+                  style={styles.alertActionButton}
+                  onPress={() => handleAlertAction(alert)}
+                >
+                  <Text
+                    style={[
+                      styles.alertActionText,
+                      { color: AlertService.getPriorityColor(alert.Priority) }
+                    ]}
+                  >
+                    Learn More
+                  </Text>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={16}
+                    color={AlertService.getPriorityColor(alert.Priority)}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+            {alert.Dismissible && (
+              <TouchableOpacity
+                style={styles.dismissButton}
+                onPress={() => handleDismissAlert(alert.id)}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={24}
+                  color={AlertService.getPriorityColor(alert.Priority)}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
 
         <View style={styles.cardsGrid}>
           {sections.map((section, index) => (
@@ -88,13 +230,6 @@ export default function HomeScreen() {
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerTitle}>Need a hand?</Text>
-          <Text style={styles.footerDescription}>
-            Reach out to your campus director or tech support if you are unsure where to go next.
-          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -118,11 +253,13 @@ const createStyles = (colors: typeof ThemeColors.light) =>
       fontWeight: '700',
       color: colors.text,
       marginBottom: 8,
+      textAlign: 'center',
     },
     welcomeSubtitle: {
       fontSize: 16,
       lineHeight: 22,
       color: colors.textSecondary,
+      textAlign: 'center',
     },
     cardsGrid: {
     },
@@ -185,6 +322,53 @@ const createStyles = (colors: typeof ThemeColors.light) =>
       fontSize: 14,
       lineHeight: 20,
       color: colors.textSecondary,
+    },
+    alertBanner: {
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      borderWidth: 1.5,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    alertIconContainer: {
+      marginRight: 14,
+      marginTop: 2,
+    },
+    alertContent: {
+      flex: 1,
+    },
+    alertTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      marginBottom: 6,
+    },
+    alertMessage: {
+      fontSize: 15,
+      lineHeight: 21,
+      marginBottom: 8,
+      fontWeight: '400',
+    },
+    alertActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      paddingVertical: 6,
+    },
+    alertActionText: {
+      fontSize: 15,
+      fontWeight: '700',
+      marginRight: 6,
+      textDecorationLine: 'underline',
+    },
+    dismissButton: {
+      padding: 4,
+      marginLeft: 12,
     },
   });
 

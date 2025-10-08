@@ -163,10 +163,13 @@ export default function UpdatesScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Updates</Text>
-        </View>
-        <View style={styles.listContainer}>
+        <View style={[styles.listContainer, { paddingTop: 50 }]}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Staff Updates</Text>
+            <Text style={styles.headerSubtitle}>
+              Stay current with announcements, action items, and campus highlights.
+            </Text>
+          </View>
           {Array.from({ length: 3 }).map((_, index) => (
             <View key={index}>{renderSkeletonCard()}</View>
           ))}
@@ -189,11 +192,6 @@ export default function UpdatesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Updates</Text>
-      </View>
-      
       <FlatList
         data={updates}
         renderItem={renderUpdate}
@@ -202,6 +200,14 @@ export default function UpdatesScreen() {
         style={styles.flatListStyle}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Staff Updates</Text>
+            <Text style={styles.headerSubtitle}>
+              Stay current with announcements, action items, and campus highlights.
+            </Text>
+          </View>
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
@@ -219,16 +225,18 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: colors.primary,
-    paddingTop: 50,
-    paddingBottom: 15,
-    paddingHorizontal: 16,
-    alignItems: 'center',
+    marginBottom: 24,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: colors.primaryText,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    lineHeight: 22,
   },
   loadingContainer: {
     flex: 1,
@@ -240,7 +248,7 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     color: colors.textSecondary,
   },
   listContainer: {
-    paddingTop: 16,
+    paddingTop: 50,
     paddingBottom: 32,
     paddingHorizontal: 16,
   },

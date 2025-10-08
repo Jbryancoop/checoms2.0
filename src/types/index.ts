@@ -28,6 +28,7 @@ export interface Message {
   recipientName: string;
   recipientEmail: string;
   content: string;
+  imageUrl?: string;
   timestamp: string;
   status: 'sending' | 'sent' | 'delivered' | 'read';
   isFromCurrentUser: boolean;

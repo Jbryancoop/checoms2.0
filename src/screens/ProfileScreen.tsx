@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/auth';
+import PreloadService from '../services/preloadService';
 import { AnyUser } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
@@ -33,6 +34,17 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
   const loadUserInfo = async () => {
     try {
       setIsLoading(true);
+
+      // Try to use preloaded data first for instant loading
+      const preloadedUser = PreloadService.getPreloadedCurrentUser();
+      if (preloadedUser) {
+        console.log('✅ Using preloaded user info');
+        setUserInfo(preloadedUser);
+        setIsLoading(false);
+        return;
+      }
+
+      // Fallback to fetching if not preloaded
       const authResult = await AuthService.getCurrentUserWithStaffInfo();
       if (authResult) {
         console.log('📸 ProfilePic data:', authResult.userInfo.ProfilePic);
