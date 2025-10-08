@@ -90,6 +90,8 @@ export type RootTabParamList = {
   Home: undefined;
   Updates: undefined;
   Info: undefined;
+  Students: undefined;
+  Attendance: undefined;
   Messages: undefined;
   Profile: undefined;
 };
@@ -114,4 +116,90 @@ export interface Student {
   'Parent Name'?: string | string[]; // Lookup field can be array
   'Parent Email'?: string | string[]; // Lookup field can be array
   recordid?: string;
+}
+
+// 25-26 All Students Types
+export interface AllStudent {
+  id: string;
+  'entry ID': string; // Primary field - student name
+  Student?: string;
+  Created?: string;
+  'Student Grade'?: 'Elementary' | 'Middle School' | 'High School';
+  Status?: 'Active' | 'Inactive' | 'Waitlist';
+  'Grade Level'?: string;
+  Programs?: string[]; // Linked record to Programs table
+  'Student Type'?: string[];
+  'Race/Ethnicity'?: string[];
+  Gender?: string[];
+  'Zip Code'?: string;
+  City?: string;
+  'Student ID'?: string;
+  SASID?: string;
+  'Students in Family'?: number;
+  'Attendance Type'?: string;
+  'Account Name'?: string;
+  'Account Created'?: string;
+  'Parent First Name'?: string;
+  'Parent Last Name'?: string;
+  'Parent Type'?: string[];
+  'Parent Email'?: string;
+  'Enrollment Status'?: string;
+  'Parent Phone'?: string;
+  Teachers?: string;
+  'Staff (from Truth)'?: string[]; // Lookup field - linked staff members
+  'recordId (from Staff) (from Truth) 2'?: string[]; // Lookup field - staff record IDs
+  'S1 Session Dates Text Rollup (from Classes)'?: string; // Comma-separated dates
+}
+
+// Program Types (2025-2026 Programs)
+export interface Program {
+  id: string;
+  Name: string; // Primary field
+  Status?: 'Closed' | 'Active' | string;
+  'EP Approval Status'?: string;
+  'Percent Filled'?: number;
+  'S1 First Class Date'?: string;
+  'Total Capacity'?: number;
+  '1st Sem Funding'?: number;
+  'Students Left 1st Semester'?: number;
+  'Number of Students'?: number;
+  'Waitlist 25-26'?: number;
+  'Pending Enrolled'?: number;
+  'Enrolled 25-26'?: number;
+  'Funded Students'?: number;
+  'Regional Director'?: string;
+  'MC Coordinator'?: string;
+  Staff?: string[]; // Linked record to Staff/Leaders table
+  'Campus Type'?: string;
+  'Campus Code'?: string;
+  'Last Name (from Staff)'?: string[];
+  'First Name (from Staff)'?: string[];
+  Campus?: string;
+  'Campus Type Single Select'?: string;
+  'Student Truth'?: string[]; // Linked record to students
+  RecordID?: string;
+  'School Year'?: string[];
+}
+
+// Alert Types
+export interface Alert {
+  id: string;
+  Title: string; // Primary field
+  Message: string;
+  Priority: 'Critical' | 'High' | 'Medium' | 'Low';
+  Status: 'Active' | 'Inactive' | 'Scheduled';
+  'Start Date': string;
+  'End Date'?: string;
+  'Specific Staff'?: string[]; // Linked record to Staff/Leaders
+  'Action Link'?: string;
+  Dismissible: boolean;
+  'Created By'?: string;
+  'Created Date'?: string;
+}
+
+// Attendance Record Types (25-26 Attendance Records)
+export interface AttendanceRecord {
+  id: string;
+  Date: string; // Date field
+  Student?: string[]; // Linked record to student(s)
 }

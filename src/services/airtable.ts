@@ -1,5 +1,5 @@
 import Airtable from 'airtable';
-import { StaffInfo, StaffUpdate, StaffMessage, Leader, AppUser, AnyUser, Student } from '../types';
+import { StaffInfo, StaffUpdate, StaffMessage, Leader, AppUser, AnyUser, Student, Program, AllStudent, Alert, AttendanceRecord } from '../types';
 
 // Initialize Airtable
 console.log('🔧 Airtable API Key:', process.env.EXPO_PUBLIC_AIRTABLE_API_KEY ? 'Present' : 'Missing');
@@ -14,6 +14,16 @@ const waiversBase = new Airtable({
   apiKey: process.env.EXPO_PUBLIC_AIRTABLE_API_KEY || '',
 }).base('appfBNaAU1viR5UIq');
 
+// Separate base for attendance - reading students from synced table
+const attendanceBase = new Airtable({
+  apiKey: process.env.EXPO_PUBLIC_AIRTABLE_API_KEY || '',
+}).base('app6SYtZRgExXiPWK');
+
+// Source base for writing attendance records (not synced)
+const attendanceSourceBase = new Airtable({
+  apiKey: process.env.EXPO_PUBLIC_AIRTABLE_API_KEY || '',
+}).base('appnol2rxwLMp4WfV');
+
 // Table IDs from your CSV
 const TABLES = {
   STAFF_INFO: 'tblO65y2oxVPbROoU',
@@ -22,6 +32,12 @@ const TABLES = {
   STAFF_MESSAGES: 'tbl0VWPjWbDv1Cv4O',
   LEADERS: 'tblltaeQ2muGLvXcb',
   STUDENTS: 'tblYQ8TAjQCvLbctg', // Students table for liability waivers
+  PROGRAMS: 'tbltWSmoXmEkrj7RC', // 2025-2026 Programs table
+  ALL_STUDENTS: 'tblHoREItr5sUgVn3', // 25-26 All Students table (synced)
+  ALERTS: 'tblNLIAkTZrCWhV9o', // Alerts table
+  ATTENDANCE_RECORDS: 'tblJ8kK7W5XVNeqeT', // 25-26 Attendance Records table (synced - read only)
+  ABSENT_SOURCE: 'tblc4WZjic55xbVdV', // Absent table (source - writable)
+  STUDENT_TRUTH: 'tbl5fRQr1QsUke8cZ', // Student Truth table (source - for lookups)
 };
 
 // Field IDs from your CSV
@@ -784,6 +800,421 @@ export class AirtableService {
       if (error.statusCode) {
         console.error('Error status code:', error.statusCode);
       }
+      throw error;
+    }
+  }
+
+  // Get programs for a staff member using Micro-Campus Data linked field
+  static async getStaffPrograms(staffRecordId: string): Promise<Program[]> {
+    try {
+      console.log('🔍 Fetching programs for staff record ID:', staffRecordId);
+
+      // Get the staff record to access Micro-Campus Data linked field
+      const staffRecord = await base(TABLES.LEADERS).find(staffRecordId);
+      const programIds = staffRecord.get('Micro-Campus Data') as string[];
+
+      console.log('🔍 Micro-Campus Data program IDs:', programIds);
+
+      if (!programIds || programIds.length === 0) {
+        console.log('ℹ️ No programs found for staff member');
+        return [];
+      }
+
+      // Fetch each program record
+      const programs: Program[] = [];
+      for (const programId of programIds) {
+        try {
+          const programRecord = await base(TABLES.PROGRAMS).find(programId);
+          programs.push({
+            id: programRecord.id,
+            Name: programRecord.get('Name') as string || 'Unnamed Program',
+            Status: programRecord.get('Status') as any,
+            'Number of Students': programRecord.get('Number of Students') as number,
+            'Enrolled 25-26': programRecord.get('Enrolled 25-26') as number,
+            Campus: programRecord.get('Campus') as string,
+            Staff: programRecord.get('Staff') as string[],
+          });
+        } catch (err) {
+          console.error('Error fetching program:', programId, err);
+        }
+      }
+
+      console.log('✅ Returning programs:', programs.length);
+      return programs;
+    } catch (error) {
+      console.error('Error fetching staff programs:', error);
+      throw error;
+    }
+  }
+
+  // Get all students for given program IDs using Student Truth from Programs
+  static async getStudentsByPrograms(programIds: string[]): Promise<AllStudent[]> {
+    try {
+      console.log('🔍 Fetching students for program IDs:', programIds);
+
+      if (!programIds || programIds.length === 0) {
+        return [];
+      }
+
+      // Get Student Truth IDs from each program
+      const studentIds: Set<string> = new Set();
+
+      for (const programId of programIds) {
+        try {
+          const programRecord = await base(TABLES.PROGRAMS).find(programId);
+          const studentTruthIds = programRecord.get('Student Truth') as string[];
+          console.log('🔍 Program', programId, 'has Student Truth IDs:', studentTruthIds);
+
+          if (studentTruthIds && studentTruthIds.length > 0) {
+            studentTruthIds.forEach(id => studentIds.add(id));
+          }
+        } catch (err) {
+          console.error('Error fetching program students:', programId, err);
+        }
+      }
+
+      console.log('🔍 Total unique student IDs:', studentIds.size);
+
+      if (studentIds.size === 0) {
+        return [];
+      }
+
+      // Fetch each student record
+      const students: AllStudent[] = [];
+
+      for (const studentId of Array.from(studentIds)) {
+        try {
+          const record = await base(TABLES.ALL_STUDENTS).find(studentId);
+
+          // Use actual field names from the schema
+          students.push({
+            id: record.id,
+            Student: record.get('entry ID') as string || '',
+            Created: record.get('Created') as string,
+            'Student Grade': record.get('New/Returning') as any,
+            Status: record.get('Status of Enrollment') as any,
+            'Grade Level': record.get('Grade Level') as string,
+            Programs: record.get('Truth') as string[], // Truth links to Programs
+            'Student Type': [],
+            'Race/Ethnicity': record.get('Race') as string[],
+            Gender: [],
+            'Zip Code': record.get('Zip Code') as string,
+            City: record.get('City') as string,
+            'Student ID': record.get('entry ID') as string,
+            SASID: '',
+            'Students in Family': 0,
+            'Attendance Type': '',
+            'Account Name': '',
+            'Account Created': '',
+            'Parent First Name': record.get('Parent First Name') as string,
+            'Parent Last Name': record.get('Parent Last Name') as string,
+            'Parent Type': [],
+            'Parent Email': record.get('Parent Email') as string,
+            'Enrollment Status': record.get('Status of Enrollment') as string,
+            'Parent Phone': record.get("Parent's Phone") as string, // Note: apostrophe in field name
+            Teachers: '',
+          });
+        } catch (err) {
+          console.error('Error fetching student:', studentId, err);
+        }
+      }
+
+      console.log('✅ Returning students:', students.length);
+      return students;
+    } catch (error: any) {
+      console.error('Error fetching students by programs:', error);
+      console.error('Error message:', error?.message);
+      console.error('Error statusCode:', error?.statusCode);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Get all active alerts
+  static async getActiveAlerts(): Promise<Alert[]> {
+    try {
+      console.log('🔍 Fetching active alerts...');
+
+      const now = new Date();
+
+      // Fetch all alerts with Status = Active
+      const records = await base(TABLES.ALERTS)
+        .select({
+          filterByFormula: `{Status} = 'Active'`,
+          sort: [{ field: 'Priority', direction: 'asc' }], // Critical first
+        })
+        .all();
+
+      console.log('🔍 Found alerts with Status=Active:', records.length);
+
+      // Filter by date in JavaScript for more control and debugging
+      const activeAlerts = records.filter(record => {
+        const startDate = record.get('Start Date') as string;
+        const endDate = record.get('End Date') as string;
+
+        console.log('🔍 Checking alert:', {
+          title: record.get('Title'),
+          startDate,
+          endDate,
+          now: now.toISOString()
+        });
+
+        // Check if alert has started
+        if (startDate) {
+          const start = new Date(startDate);
+          if (start > now) {
+            console.log('❌ Alert not started yet');
+            return false;
+          }
+        }
+
+        // Check if alert has ended
+        if (endDate) {
+          const end = new Date(endDate);
+          if (end < now) {
+            console.log('❌ Alert has ended');
+            return false;
+          }
+        }
+
+        console.log('✅ Alert is active');
+        return true;
+      });
+
+      console.log('🔍 Found active alerts after date filtering:', activeAlerts.length);
+
+      const alerts: Alert[] = activeAlerts.map(record => ({
+        id: record.id,
+        Title: record.get('Title') as string,
+        Message: record.get('Message') as string,
+        Priority: record.get('Priority') as any,
+        Status: record.get('Status') as any,
+        'Start Date': record.get('Start Date') as string,
+        'End Date': record.get('End Date') as string,
+        'Specific Staff': record.get('Specific Staff') as string[],
+        'Action Link': record.get('Action Link') as string,
+        Dismissible: record.get('Dismissible') as boolean,
+        'Created By': record.get('Created By') as string,
+        'Created Date': record.get('Created Date') as string,
+      }));
+
+      console.log('✅ Returning active alerts:', alerts.length);
+      return alerts;
+    } catch (error: any) {
+      console.error('Error fetching active alerts:', error);
+      console.error('Error message:', error?.message);
+      throw error;
+    }
+  }
+
+  // Get all students with session dates for a specific leader
+  static async getAllStudentsWithSessionDates(leaderId?: string): Promise<any[]> {
+    try {
+      console.log('🔍 Fetching all students with session dates for leader:', leaderId);
+
+      const filterFormula = leaderId
+        ? `FIND('${leaderId}', ARRAYJOIN({recordId (from Staff) (from Truth) 2})) > 0`
+        : '';
+
+      const records = await attendanceBase(TABLES.ALL_STUDENTS)
+        .select({
+          ...(filterFormula && { filterByFormula: filterFormula }),
+        })
+        .all();
+
+      console.log('🔍 Found students:', records.length);
+
+      const students = records.map(record => {
+        const studentName = record.get('entry ID') as string;
+        const sessionDates = record.get('S1 Session Dates Text Rollup (from Classes)') as string;
+        const recordIds = record.get('recordId (from Staff) (from Truth) 2') as string[];
+
+        console.log('📋 Student:', studentName, 'Session dates:', sessionDates, 'RecordIds:', recordIds);
+
+        return {
+          id: record.id,
+          studentName: studentName || 'Unknown', // Store the name for creating attendance records
+          Student: studentName || 'Unknown',
+          'S1 Session Dates Text Rollup (from Classes)': sessionDates || '',
+        };
+      });
+
+      // Sort by last name, then first name
+      students.sort((a, b) => {
+        const nameA = a.Student || '';
+        const nameB = b.Student || '';
+        return nameA.localeCompare(nameB);
+      });
+
+      console.log('✅ Returning students:', students.length);
+      return students;
+    } catch (error: any) {
+      console.error('Error fetching students:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Get attendance records for a specific date (from SOURCE table for real-time data)
+  static async getAttendanceRecordsForDate(date: string): Promise<any[]> {
+    try {
+      console.log('📅 ========== FETCHING ATTENDANCE RECORDS ==========');
+      console.log('📅 Date to search:', date);
+      console.log('📅 Base ID: appnol2rxwLMp4WfV (SOURCE base)');
+      console.log('📅 Table ID:', TABLES.ABSENT_SOURCE, '(Absent - SOURCE table for real-time data)');
+      console.log('📅 Filter formula: {Date} =', date);
+
+      // First, let's see if there are any records with appID to verify field name
+      const recentWithAppId = await attendanceSourceBase(TABLES.ABSENT_SOURCE)
+        .select({
+          filterByFormula: `{appID} != ''`,
+          maxRecords: 5,
+          sort: [{ field: 'Date', direction: 'desc' }],
+        })
+        .all();
+
+      console.log('📅 DEBUG: Found', recentWithAppId.length, 'records WITH appID field populated');
+      if (recentWithAppId.length > 0) {
+        console.log('📅 DEBUG: Available field names:', Object.keys(recentWithAppId[0].fields));
+        recentWithAppId.forEach(record => {
+          console.log('📅 DEBUG Record with appID:', {
+            id: record.id,
+            Date: record.get('Date'),
+            appID: record.get('appID'),
+            Student: record.get('Student'),
+          });
+        });
+      }
+
+      // Now filter by date - use DATESTR to convert Date field to string for comparison
+      const records = await attendanceSourceBase(TABLES.ABSENT_SOURCE)
+        .select({
+          filterByFormula: `DATESTR({Date}) = '${date}'`,
+        })
+        .all();
+
+      console.log('📅 ========== FOUND', records.length, 'ATTENDANCE RECORDS FOR DATE', date, '==========');
+
+      if (records.length > 0) {
+        // Show all available fields in first record
+        console.log('📅 Available fields in record:', Object.keys(records[0].fields));
+        console.log('📅 Sample record data:', records[0].fields);
+      }
+
+      const attendanceRecords = records.map(record => {
+        const appID = record.get('appID') as string;
+        const date = record.get('Date') as string;
+
+        console.log('📋 Attendance Record:', {
+          id: record.id,
+          Date: date,
+          appID: appID,
+          allFields: record.fields
+        });
+
+        return {
+          id: record.id,
+          Date: date,
+          appID: appID, // This is the synced table student record ID
+        };
+      });
+
+      console.log('✅ Returning', attendanceRecords.length, 'attendance records');
+      console.log('✅ appIDs:', attendanceRecords.map(r => r.appID));
+      return attendanceRecords;
+    } catch (error: any) {
+      console.error('❌ Error fetching attendance records:', error);
+      console.error('❌ Error message:', error?.message);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Look up student ID in Student Truth table by entry ID (name)
+  static async getStudentTruthIdByName(studentName: string): Promise<string | null> {
+    try {
+      console.log('🔍 Looking up Student Truth record for:', studentName);
+
+      const records = await attendanceSourceBase(TABLES.STUDENT_TRUTH)
+        .select({
+          filterByFormula: `{entry ID} = '${studentName}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        console.error('❌ No Student Truth record found for:', studentName);
+        return null;
+      }
+
+      const recordId = records[0].id;
+      console.log('✅ Found Student Truth record ID:', recordId);
+      return recordId;
+    } catch (error: any) {
+      console.error('Error looking up student in Student Truth:', error);
+      return null;
+    }
+  }
+
+  // Create an attendance record (requires Student Truth record ID and synced table record ID)
+  static async createAttendanceRecord(date: string, studentName: string, syncedTableRecordId: string): Promise<any> {
+    try {
+      console.log('📝 ========== CREATING ATTENDANCE RECORD ==========');
+      console.log('📝 Student Name (entry ID):', studentName);
+      console.log('📝 Synced Table Record ID:', syncedTableRecordId);
+      console.log('📝 Date:', date);
+
+      // First, look up the student's record ID in Student Truth table
+      const studentTruthId = await this.getStudentTruthIdByName(studentName);
+
+      if (!studentTruthId) {
+        throw new Error(`Could not find Student Truth record for: ${studentName}`);
+      }
+
+      console.log('📝 Target Base: appnol2rxwLMp4WfV (SOURCE base)');
+      console.log('📝 Target Table: tblc4WZjic55xbVdV (Absent - source table)');
+      console.log('📝 Student Truth Record ID:', studentTruthId);
+      console.log('📝 API Key present:', !!process.env.EXPO_PUBLIC_AIRTABLE_API_KEY);
+
+      console.log('📝 Attempting to CREATE record in SOURCE table with payload:', {
+        Date: date,
+        Student: [studentTruthId],
+        appID: syncedTableRecordId
+      });
+
+      const record = await attendanceSourceBase(TABLES.ABSENT_SOURCE).create({
+        Date: date,
+        Student: [studentTruthId],
+        appID: syncedTableRecordId, // Store the synced table record ID for matching
+      });
+
+      console.log('✅ Created attendance record in SOURCE table:', record.id);
+      console.log('✅ This will sync to the 25-26 Attendance Records table via 2-way sync');
+      return {
+        id: record.id,
+        Date: record.get('Date') as string,
+        appID: record.get('appID') as string,
+      };
+    } catch (error: any) {
+      console.error('❌ ========== CREATE FAILED ==========');
+      console.error('❌ Error type:', error?.error);
+      console.error('❌ Status code:', error?.statusCode);
+      console.error('❌ Message:', error?.message);
+      console.error('❌ Full error:', JSON.stringify(error, null, 2));
+      throw error;
+    }
+  }
+
+  // Delete an attendance record (from source table)
+  static async deleteAttendanceRecord(recordId: string): Promise<void> {
+    try {
+      console.log('🗑️ Deleting attendance record from SOURCE table:', recordId);
+
+      await attendanceSourceBase(TABLES.ABSENT_SOURCE).destroy(recordId);
+
+      console.log('✅ Deleted attendance record from SOURCE table');
+    } catch (error: any) {
+      console.error('Error deleting attendance record:', error);
       throw error;
     }
   }

@@ -9,6 +9,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import HomeScreen from '../screens/HomeScreen';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import InfoScreen from '../screens/InfoScreen';
+import StudentsScreen from '../screens/StudentsScreen';
+import AttendanceScreen from '../screens/AttendanceScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -50,6 +52,10 @@ export default function AppNavigator({ onLogout }: AppNavigatorProps) {
               iconName = focused ? 'newspaper' : 'newspaper-outline';
             } else if (route.name === 'Info') {
               iconName = focused ? 'information-circle' : 'information-circle-outline';
+            } else if (route.name === 'Students') {
+              iconName = focused ? 'school' : 'school-outline';
+            } else if (route.name === 'Attendance') {
+              iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
             } else if (route.name === 'Messages') {
               iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
             } else if (route.name === 'Profile') {
@@ -67,7 +73,7 @@ export default function AppNavigator({ onLogout }: AppNavigatorProps) {
             borderTopColor: colors.separator,
           },
           headerStyle: {
-            backgroundColor: colors.primary,
+            backgroundColor: colors.headerBackground,
           },
           headerTintColor: colors.primaryText,
           headerTitleStyle: {
@@ -91,13 +97,29 @@ export default function AppNavigator({ onLogout }: AppNavigatorProps) {
             headerShown: false
           }}
         />
-        <Tab.Screen 
-          name="Info" 
+        <Tab.Screen
+          name="Info"
           component={InfoScreen}
           options={{ title: 'Info' }}
         />
-        <Tab.Screen 
-          name="Messages" 
+        <Tab.Screen
+          name="Students"
+          component={StudentsScreen}
+          options={{
+            title: 'Students',
+            headerShown: false
+          }}
+        />
+        <Tab.Screen
+          name="Attendance"
+          component={AttendanceScreen}
+          options={{
+            title: 'Attendance',
+            headerShown: false
+          }}
+        />
+        <Tab.Screen
+          name="Messages"
           component={MessagesScreen}
           options={{ title: 'Messages' }}
         />
