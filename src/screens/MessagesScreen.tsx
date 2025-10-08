@@ -22,6 +22,9 @@ import ConversationScreen from './ConversationScreen';
 import ProfileImage from '../components/ProfileImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import { HapticFeedback } from '../utils/haptics';
+import { MessageSkeleton } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 
 export default function MessagesScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -132,6 +135,7 @@ export default function MessagesScreen() {
   };
 
   const handleNewMessage = () => {
+    HapticFeedback.light();
     setShowUserSelection(true);
   };
 
@@ -146,6 +150,7 @@ export default function MessagesScreen() {
   };
 
   const handleDeleteConversation = async (conversationId: string) => {
+    HapticFeedback.warning();
     Alert.alert(
       'Delete Conversation',
       'Are you sure you want to delete this conversation?',
@@ -155,6 +160,7 @@ export default function MessagesScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            HapticFeedback.heavy();
             try {
               if (!currentUser?.UID) {
                 Alert.alert('Error', 'User not found');
@@ -162,9 +168,11 @@ export default function MessagesScreen() {
               }
               await MessageService.deleteConversation(conversationId, currentUser.UID);
               console.log('[MSG] ✅ Conversation deleted successfully');
+              HapticFeedback.success();
             } catch (error) {
               console.error('[MSG] ❌ Error deleting conversation:', error);
               Alert.alert('Error', 'Failed to delete conversation. Please try again.');
+              HapticFeedback.error();
             }
           },
         },
@@ -214,7 +222,10 @@ export default function MessagesScreen() {
         <View style={styles.conversationCard}>
           <TouchableOpacity
             style={styles.conversationInfo}
-            onPress={() => setSelectedRecipient(item.recipient)}
+            onPress={() => {
+              HapticFeedback.light();
+              setSelectedRecipient(item.recipient);
+            }}
             activeOpacity={0.7}
           >
             <ProfileImage
@@ -260,17 +271,13 @@ export default function MessagesScreen() {
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
-      <Text style={styles.emptyStateText}>No conversations yet</Text>
-      <Text style={styles.emptyStateSubtext}>
-        Start a conversation by tapping the compose button
-      </Text>
-      <TouchableOpacity style={styles.newMessageButton} onPress={handleNewMessage}>
-        <Ionicons name="add" size={20} color={colors.primaryText} />
-        <Text style={styles.newMessageButtonText}>New Message</Text>
-      </TouchableOpacity>
-    </View>
+    <EmptyState
+      icon="chatbubbles-outline"
+      title="No conversations yet"
+      description="Start connecting with your teammates and campus directors. Send your first message to get started."
+      actionText="New Message"
+      onActionPress={handleNewMessage}
+    />
   );
 
   const renderHeader = () => (
@@ -299,9 +306,10 @@ export default function MessagesScreen() {
     return (
       <GestureHandlerRootView style={styles.container}>
         {renderHeader()}
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading conversations...</Text>
+        <View style={styles.listContainer}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <MessageSkeleton key={i} />
+          ))}
         </View>
       </GestureHandlerRootView>
     );

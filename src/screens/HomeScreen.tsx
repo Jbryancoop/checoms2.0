@@ -17,6 +17,7 @@ import { RootTabParamList, Alert } from '../types';
 import { Colors as ThemeColors } from '../theme/colors';
 import { AlertService } from '../services/alertService';
 import { AuthService } from '../services/auth';
+import { HapticFeedback } from '../utils/haptics';
 
 type NavigationProp = BottomTabNavigationProp<RootTabParamList, 'Home'>;
 
@@ -69,11 +70,13 @@ export default function HomeScreen() {
   }, [loadAlerts]);
 
   const handleDismissAlert = async (alertId: string) => {
+    HapticFeedback.light();
     await AlertService.dismissAlert(alertId);
     setAlerts(alerts.filter(a => a.id !== alertId));
   };
 
   const handleAlertAction = (alert: Alert) => {
+    HapticFeedback.light();
     if (alert['Action Link']) {
       Linking.openURL(alert['Action Link']).catch(err => {
         console.error('Failed to open link:', err);
@@ -216,7 +219,10 @@ export default function HomeScreen() {
               key={section.key}
               style={[styles.card, index === sections.length - 1 && styles.lastCard]}
               activeOpacity={0.9}
-              onPress={() => navigation.navigate(section.key)}
+              onPress={() => {
+                HapticFeedback.light();
+                navigation.navigate(section.key);
+              }}
               accessibilityRole="button"
               accessibilityLabel={`${section.title}. ${section.description}`}
             >

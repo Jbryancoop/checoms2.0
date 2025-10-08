@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { AuthService } from '../services/auth';
 import { auth } from '../services/firebase';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import { HapticFeedback } from '../utils/haptics';
 
 
 interface AuthScreenProps {
@@ -31,9 +32,11 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const signInWithGoogle = async () => {
     try {
       setIsLoading(true);
+      HapticFeedback.light();
 
       const authResult = await AuthService.signInWithGoogle();
       if (authResult) {
+        HapticFeedback.success();
         onAuthSuccess();
       }
     } catch (error: any) {
@@ -61,6 +64,7 @@ export default function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
       // For actual errors, show the alert
       console.error('Google sign-in error:', error);
+      HapticFeedback.error();
       Alert.alert(
         'Authentication Error',
         error.message || 'An error occurred during authentication. Please try again.'

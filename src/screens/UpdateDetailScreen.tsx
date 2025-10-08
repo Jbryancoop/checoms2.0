@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   Linking,
   Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { StaffUpdate } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -70,10 +70,12 @@ export default function UpdateDetailScreen({ update, onBack }: UpdateDetailScree
         {/* Image */}
         {getImageUrl() && (
           <View style={styles.imageContainer}>
-            <Image 
-              source={{ uri: getImageUrl()! }} 
+            <Image
+              source={{ uri: getImageUrl()! }}
               style={styles.image}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={300}
+              cachePolicy="memory-disk"
             />
           </View>
         )}

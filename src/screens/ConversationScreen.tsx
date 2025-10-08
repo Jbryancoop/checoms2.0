@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
   Keyboard,
   Image,
+  ActionSheetIOS,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 // import * as ImagePicker from 'expo-image-picker';
@@ -23,6 +25,7 @@ import { AnyUser, Message } from '../types';
 import ProfileImage from '../components/ProfileImage';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import { HapticFeedback } from '../utils/haptics';
 
 
 interface ConversationScreenProps {
@@ -178,6 +181,7 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
     const messageContent = newMessage.trim();
     setNewMessage('');
     setIsSending(true);
+    HapticFeedback.medium();
 
     try {
       await MessageService.sendMessage(
@@ -189,9 +193,11 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
         'CHE Email' in recipient ? recipient['CHE Email'] : recipient['Email'],
         messageContent
       );
+      HapticFeedback.success();
     } catch (error) {
       console.error('[MSG] Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
+      HapticFeedback.error();
     } finally {
       setIsSending(false);
     }
@@ -209,15 +215,103 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
     }
   };
 
+  const handleMessageLongPress = (message: Message) => {
+    HapticFeedback.medium();
+
+    const options = ['Copy', 'Delete', 'Cancel'];
+    const destructiveButtonIndex = 1;
+    const cancelButtonIndex = 2;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex,
+          cancelButtonIndex,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) {
+            // Copy
+            Clipboard.setString(message.content);
+            HapticFeedback.light();
+          } else if (buttonIndex === 1) {
+            // Delete
+            handleDeleteMessage(message);
+          }
+        }
+      );
+    } else {
+      // Android - use Alert
+      Alert.alert(
+        'Message Options',
+        '',
+        [
+          {
+            text: 'Copy',
+            onPress: () => {
+              Clipboard.setString(message.content);
+              HapticFeedback.light();
+            },
+          },
+          {
+            text: 'Delete',
+            onPress: () => handleDeleteMessage(message),
+            style: 'destructive',
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+    }
+  };
+
+  const handleDeleteMessage = (message: Message) => {
+    Alert.alert(
+      'Delete Message',
+      'Are you sure you want to delete this message?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            HapticFeedback.heavy();
+            try {
+              if (!currentUser?.UID) {
+                Alert.alert('Error', 'User not found');
+                return;
+              }
+              await MessageService.deleteMessage(message.id, currentUser.UID);
+              HapticFeedback.success();
+            } catch (error) {
+              console.error('Error deleting message:', error);
+              Alert.alert('Error', 'Failed to delete message');
+              HapticFeedback.error();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[
       styles.messageContainer,
       item.isFromCurrentUser ? styles.sentMessage : styles.receivedMessage
     ]}>
-      <View style={[
-        styles.messageBubble,
-        item.isFromCurrentUser ? styles.sentBubble : styles.receivedBubble
-      ]}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onLongPress={() => handleMessageLongPress(item)}
+        style={[
+          styles.messageBubble,
+          item.isFromCurrentUser ? styles.sentBubble : styles.receivedBubble
+        ]}
+      >
         {/* {item.imageUrl && (
           <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
         )} */}
@@ -237,22 +331,21 @@ export default function ConversationScreen({ recipient, onBack }: ConversationSc
           {item.isFromCurrentUser && (
             <Ionicons
               name={
-                item.status === 'sending' ? 'time' :
+                item.status === 'sending' ? 'time-outline' :
                 item.status === 'sent' ? 'checkmark' :
-                item.status === 'delivered' ? 'checkmark-done' :
                 'checkmark-done'
               }
-              size={12}
+              size={14}
               color={
-                item.status === 'sending' || item.status === 'sent' || item.status === 'delivered'
-                  ? colors.textSecondary
-                  : colors.primary
+                item.status === 'read'
+                  ? colors.primary
+                  : colors.textSecondary
               }
               style={styles.statusIcon}
             />
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 

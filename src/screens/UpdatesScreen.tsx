@@ -7,8 +7,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { StaffUpdate } from '../types';
 import { AirtableService } from '../services/airtable';
@@ -16,6 +16,9 @@ import PreloadService from '../services/preloadService';
 import UpdateDetailScreen from './UpdateDetailScreen';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import { UpdateSkeleton } from '../components/Skeleton';
+import { HapticFeedback } from '../utils/haptics';
+import { EmptyState } from '../components/EmptyState';
 
 export default function UpdatesScreen() {
   const [updates, setUpdates] = useState<StaffUpdate[]>([]);
@@ -65,6 +68,7 @@ export default function UpdatesScreen() {
   }, [loadUpdates]);
 
   const handleUpdatePress = (update: StaffUpdate) => {
+    HapticFeedback.light();
     setSelectedUpdate(update);
   };
 
@@ -113,7 +117,13 @@ export default function UpdatesScreen() {
         style={styles.updateCard}
       >
         {imageUrl && (
-          <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.cardImage}
+            contentFit="cover"
+            transition={300}
+            cachePolicy="memory-disk"
+          />
         )}
         <View style={styles.cardContent}>
           <Text style={styles.updateTitle}>{item.Title}</Text>
@@ -131,33 +141,13 @@ export default function UpdatesScreen() {
   };
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="newspaper-outline" size={64} color={colors.textSecondary} />
-      <Text style={styles.emptyStateText}>No updates yet</Text>
-      <Text style={styles.emptyStateSubtext}>
-        Check back later for important announcements and updates
-      </Text>
-      <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-        <Ionicons name="refresh" size={16} color={colors.primary} />
-        <Text style={styles.refreshButtonText}>Refresh</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderSkeletonCard = () => (
-    <View style={[styles.updateCard, styles.skeletonCard]}>
-      <View style={styles.skeletonImage} />
-      <View style={styles.cardContent}>
-        <View style={styles.skeletonTitle} />
-        <View style={styles.skeletonDate} />
-        <View style={styles.skeletonDescription} />
-        <View style={[styles.skeletonDescription, { width: '60%' }]} />
-        <View style={styles.cardFooter}>
-          <View style={styles.skeletonReadMore} />
-          <View style={styles.skeletonChevron} />
-        </View>
-      </View>
-    </View>
+    <EmptyState
+      icon="newspaper-outline"
+      title="No updates yet"
+      description="Stay tuned for important announcements, action items, and campus highlights. Pull to refresh for the latest updates."
+      actionText="Refresh Now"
+      onActionPress={onRefresh}
+    />
   );
 
   if (isLoading) {
@@ -170,8 +160,8 @@ export default function UpdatesScreen() {
               Stay current with announcements, action items, and campus highlights.
             </Text>
           </View>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <View key={index}>{renderSkeletonCard()}</View>
+          {[1, 2, 3].map((i) => (
+            <UpdateSkeleton key={i} />
           ))}
         </View>
       </View>

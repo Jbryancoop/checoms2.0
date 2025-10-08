@@ -16,6 +16,8 @@ import PreloadService from '../services/preloadService';
 import { AnyUser } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import SettingsScreen from './SettingsScreen';
+import { HapticFeedback } from '../utils/haptics';
 
 interface ProfileScreenProps {
   onLogout: () => void;
@@ -24,6 +26,7 @@ interface ProfileScreenProps {
 export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
   const [userInfo, setUserInfo] = useState<AnyUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const { colors, isDarkMode, setTheme } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -87,7 +90,13 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
   };
 
   const handleThemeToggle = (value: boolean) => {
+    HapticFeedback.light();
     setTheme(value ? 'dark' : 'light');
+  };
+
+  const handleOpenSettings = () => {
+    HapticFeedback.light();
+    setShowSettings(true);
   };
 
   if (isLoading) {
@@ -109,6 +118,10 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
         </TouchableOpacity>
       </View>
     );
+  }
+
+  if (showSettings) {
+    return <SettingsScreen />;
   }
 
   return (
@@ -190,6 +203,13 @@ export default function ProfileScreen({ onLogout }: ProfileScreenProps) {
           />
         </View>
       </View>
+
+      {/* More Settings Button */}
+      <TouchableOpacity style={styles.settingsButton} onPress={handleOpenSettings}>
+        <Ionicons name="settings-outline" size={20} color={colors.primary} />
+        <Text style={styles.settingsButtonText}>More Settings</Text>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} style={{ marginLeft: 'auto' }} />
+      </TouchableOpacity>
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -362,6 +382,27 @@ const createStyles = (colors: typeof ThemeColors.light) => StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  settingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginTop: 10,
+    marginBottom: 10,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  settingsButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginLeft: 10,
   },
   logoutButton: {
     flexDirection: 'row',

@@ -19,6 +19,9 @@ import PreloadService from '../services/preloadService';
 import { AllStudent, Program } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { Colors as ThemeColors } from '../theme/colors';
+import { StudentSkeleton } from '../components/Skeleton';
+import { HapticFeedback } from '../utils/haptics';
+import { EmptyState } from '../components/EmptyState';
 
 export default function StudentsScreen() {
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -113,6 +116,7 @@ export default function StudentsScreen() {
   };
 
   const handleStudentPress = (student: AllStudent) => {
+    HapticFeedback.light();
     setSelectedStudent(student);
     setShowDetailModal(true);
   };
@@ -255,10 +259,21 @@ export default function StudentsScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Loading students...</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Students</Text>
         </View>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search students..."
+            placeholderTextColor={colors.textSecondary}
+            editable={false}
+          />
+        </View>
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <StudentSkeleton key={i} />
+        ))}
       </View>
     );
   }
@@ -297,17 +312,17 @@ export default function StudentsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.studentsList}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={64} color={colors.textSecondary} />
-              <Text style={styles.emptyStateText}>
-                {searchQuery ? 'No students found matching your search' : 'No students found'}
-              </Text>
-              {searchQuery && (
-                <TouchableOpacity style={styles.clearButton} onPress={() => handleSearch('')}>
-                  <Text style={styles.clearButtonText}>Clear Search</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <EmptyState
+              icon="people-outline"
+              title={searchQuery ? 'No students found' : 'No students yet'}
+              description={
+                searchQuery
+                  ? 'Try adjusting your search terms or clear the search to see all students.'
+                  : 'Students will appear here once they are enrolled in your programs.'
+              }
+              actionText={searchQuery ? 'Clear Search' : undefined}
+              onActionPress={searchQuery ? () => handleSearch('') : undefined}
+            />
           }
         />
       </View>
